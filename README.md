@@ -1,25 +1,25 @@
 RV32 Emulator written in C++20
 
-Project Tree:<br\>
-    +- LICENSE<br\>
-    +- README.md<br\>
-    +- Makefile<br\>
-    +- src<br\>
-       +- main.cpp<br\>
-       +- common.hpp<br\>
-       +- memory.hpp<br\>
-       +- memory.cpp<br\>
-       +- registers.hpp<br\>
+Project Tree:
+    +- LICENSE
+    +- README.md
+    +- Makefile
+    +- src
+       +- main.cpp
+       +- common.hpp
+       +- memory.hpp
+       +- memory.cpp
+       +- registers.hpp
 
-Registers (32bit):<br\>
-    X0 - X31 (Accumulators)<br\>
-    PC       (Program counter)<br\>
+Registers (32bit):
+    X0 - X31 (Accumulators)
+    PC       (Program counter)
 
-Memory Layout:<br\>
+Memory Layout:
 // TODO
 
-Features:<br\>
+Features:
 // TODO
 
-Changelog:<br\>
+Changelog:
 // TODO
