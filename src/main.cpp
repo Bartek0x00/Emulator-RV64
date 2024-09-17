@@ -1,21 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "Emulator.hpp"
-
-using namespace Emulator;
+#include "emulator.hpp"
 
 int main(int argc, char *argv[])
 {
-    if (argc < 2)
-        error("Usage: rv32-emu [image]");
+    if (argc < 2) {
+        fprintf(stderr, "Usage: rv32-emu [image]\n");
+		exit(EXIT_FAILURE);
+	}
 
-    if (!Memory::load_img(argv[1]))
-        error("Cannot load the provided image!");
+    if (!Emulator::Memory::load_img(argv[1])) {
+        fprintf(stderr, "Cannot load %s !\n", argv[1]);
+		exit(EXIT_FAILURE);
+	}
 
-    while(1) {
-        if (!Operations(Memory::next_instr()))
-            break;
-    }
+	Emulator::run();
 
     return 0;
 }
