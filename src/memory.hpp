@@ -5,12 +5,11 @@
 namespace Emulator {
 	class Memory {
 	private:
-		uint8_t mem[SIZE];
+		uint8_t mem[SIZE] = {0};
+
 	public:
 		constexpr size_t SIZE = (1024 * 1024);
 		constexpr size_t BASE = 0x80000000;
-    	
-		static bool load_img(const char *filename);
 	
 		template<typename U>
 		inline U& operator[](uint64_t addr)
@@ -22,7 +21,12 @@ namespace Emulator {
 					this->mem[addr]
 				);
 			else
-				;
+				error<FAIL>("Memory access out of bounds");
+		}
+
+		inline operator uint16_t *(void)
+		{
+			return &this->mem;
 		}
 	};
 };

@@ -1,19 +1,14 @@
-#include "registers.hpp"
 #include "memory.hpp"
 
 using namespace Emulator;
 
-Memory::load_img(const char *filename)
+bool Memory::load_img(const char *filename)
 {
     FILE *file = fopen(filename, "r+");
-    bool ret = true;
-    
-    // TODO: Handling image encoding
+    if (!file)
+        return false;
+
+    fread(memory, SIZE, 1, file);
 
     fclose(file);
-}
-
-Memory::next_instr(void)
-{
-    return Registers[Registers::PC]++;
 }

@@ -1,8 +1,7 @@
 #pragma once
 
 namespace Emulator {
-	class Registers;
-	class Memory;
+	class Cpu;
 
 	void run(void);
 
@@ -24,15 +23,13 @@ namespace Emulator {
 	template<>
 	inline void error<WARN>(const char *msg)
 	{
-		fprintf(stderr, "%s%s%s\n", 
-				ORANGE, msg, CLEAR);
+		fprintf(stderr, "\033[38;5;3m%s\033[38;5;0m\n", msg);
 	}
 
 	template<>
 	inline void error<FAIL>(const char *msg)
 	{
-		fprintf(stderr, "%s%s%s\n",
-				RED, msg, CLEAR);
+		fprintf(stderr, "\033[38;5;1m%s\033[38;5;0m\n", msg);
 		exit(EXIT_FAILURE);
 	}
 };
