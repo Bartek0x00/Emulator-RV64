@@ -6,7 +6,7 @@ using namespace Emulator;
 int main(int argc, char *argv[])
 {
     if (argc < 2)
-        error<FAIL>("Usage: rv64-emu [image]");
+        error("Usage: rv64-emu [image]");
 
 	Emulator::Memory::load_img(argv[1]);
         

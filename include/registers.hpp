@@ -1,7 +1,7 @@
+#pragma once
+
 #include <cstdint>
 #include "errors.hpp"
-
-#pragma once
 
 namespace Emulator {
     class Registers {
@@ -58,9 +58,10 @@ namespace Emulator {
 			if (index < COUNT)
 				return regs[index];
 				
-			error<FAIL>(
+			error<FAIL, ULONG>(
 				"Register access out of bounds: ", index
-			);	
+			);
+			
 			return const_cast<T&>(ZERO);
 		}
 
