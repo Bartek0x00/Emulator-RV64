@@ -1,16 +1,16 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "emulator.hpp"
+#include "errors.hpp"
+
+using namespace Emulator;
 
 int main(int argc, char *argv[])
 {
     if (argc < 2)
         error<FAIL>("Usage: rv64-emu [image]");
 
-    if (!Emulator::Memory::load_img(argv[1]));
-        error<FAIL>("Cannot load the image");
+	Emulator::Memory::load_img(argv[1]);
         
-	Emulator::run();
+	//Emulator::run();
 
     return 0;
 }

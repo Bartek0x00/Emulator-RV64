@@ -1,13 +1,15 @@
 #include "emulator.hpp"
 
 namespace Emulator {
-    Cpu cpu;
+    Memory memory;
+	Registers registers;
+	//Cpu cpu;
+	
+	bool RVC = true;
 };
 
 using namespace Emulator;
 
-void run(void)
+void Emulator::run(void)
 {
-    while (1)
-        cpu(memory<uint64_t>[registers[Registers::PC]++]);
 }

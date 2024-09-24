@@ -1,11 +1,16 @@
-#include <stdint.h>
+#include <cstdint>
+#include "errors.hpp"
 
 #pragma once
 
 namespace Emulator {
     class Registers {
-    private:
-        uint64_t regs[COUNT] = {0};
+	public:
+    	static constexpr uint64_t COUNT = 33;
+		static constexpr uint64_t ZERO = 0;
+
+	private:
+    	uint64_t regs[COUNT] = {0};
 
     public:
         enum RegisterNames {
@@ -44,21 +49,24 @@ namespace Emulator {
         	PC  = 0b100000,
     	};
 
-    	static constexpr size_t COUNT = 33;
-
-    	inline uint64_t& operator[](size_t index)
+		template<typename T>
+    	inline T& operator[](uint64_t index)
 		{
+			if (!index)
+				return const_cast<T&>(ZERO);
+
 			if (index < COUNT)
-				return this->regs[index];
-			else
-				error<FAIL>("Register access out of bounds");
+				return regs[index];
+				
+			error<FAIL>(
+				"Register access out of bounds: ", index
+			);	
+			return const_cast<T&>(ZERO);
 		}
 
 		Registers(void)
 		{
-			this->regs[R0] = 0;
-			this->regs[R2] = Memory::BASE + Memory::SIZE;
-			this->regs[PC] = Memory::BASE;
+			regs[X2] = Memory::BASE + Memory::SIZE;
 		}
 	};
 };
