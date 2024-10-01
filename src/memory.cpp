@@ -1,31 +1,19 @@
 #include <elf.h>
 #include <cstdio>
 #include <cstring>
-#include "errors.hpp"
 
-using namespace Emulator;
+using Emulator;
 
 Memory::Memory(uint64_t mem_size) : size(mem_size), mem(mem_size, 0) {}
 
-Memory::Memory(uint64_t mem_size, const char *file) : Memory(mem_size)
+Memory::Memory(uint64_t mem_size, const char *filepath) : Memory(mem_size)
 {
-	FILE *file = fopen(file);
-	if (!file)
-		error<FAIL, STRING>("Cannot open file:", file);
+	std::ifstream file(filepath);
 
-	fseek(file, 0, SEEK_END);
-	uint64_t file_size = ftell(file);
-	rewind(file); 
+	if (!file.is_open())
+		error<FAIL>("Cannot open the image file");
 
-	if (file_size > mem_size) {
-		mem.reserve(mem_size);
-		fread(mem.data(), 1, mem_size, file);
-	} else {
-		mem.reserve(file_size);
-		fread(mem.data(), 1, file_size, file);
-	}
-
-	fclose(file);
+	
 }
 
 bool Memory::load(uint64_t addr, uint64_t bytes, uint8_t *buffer)

@@ -1,13 +1,10 @@
 #include "emulator.hpp"
 
-namespace Emulator {
-	Bus bus;
-	Cpu cpu;
-	
-	bool RVC = true;
-};
+Emulator::Emulator(const char *filepath)
+{
 
-using namespace Emulator;
+	run();
+}
 
 void Emulator::run(void)
 {

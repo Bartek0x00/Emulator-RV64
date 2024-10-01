@@ -1,5 +1,5 @@
 CXX=g++
-CXX_FLAGS=
+CXX_FLAGS=-Iinclude/
 SRCS=$(wildcard src/*.cpp)
 EXEC=rv64-emu
 
@@ -9,7 +9,7 @@ all: link
 	./$(EXEC)
 
 link:
-	$(CXX) $(CXX_FLAGS) src/main.cpp src/memory.cpp src/emulator.cpp -o $(EXEC)
+	$(CXX) $(CXX_FLAGS) $(SRCS) -o $(EXEC)
 
 clean:
 	rm -rf src/*.o
