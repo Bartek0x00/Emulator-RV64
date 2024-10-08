@@ -1,7 +1,7 @@
 #include <exception>
 #include "emulator.hpp"
 
-using Emulator;
+using namespace Emulator;
 
 int main(int argc, char *argv[])
 {
