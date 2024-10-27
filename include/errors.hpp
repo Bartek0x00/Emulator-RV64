@@ -1,10 +1,13 @@
 #pragma once
 
+#include <exception>
+
 namespace Emulator {
 	enum class Error : uint64_t {
         INFO = 0,
         WARN,
         FAIL,
+		EXIT
     };
 	
 	constexpr const char *COLOR_NONE = "\033[0m";

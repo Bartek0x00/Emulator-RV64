@@ -2,11 +2,11 @@
 #include "bus.hpp"
 #include "errors.hpp"
 
-Bus::Device& operator[](uint64_t address) const
+Device& Bus::find(uint64_t addr) const
 {
 	for (const Device& device : devices) {
-		if (address >= device.base && \
-			address < device.base + device.size)
+		if (addr >= device.base && \
+			addr < device.base + device.size)
 		{
 			return device;
 		}
@@ -14,8 +14,9 @@ Bus::Device& operator[](uint64_t address) const
 
 	error<FAIL>(
 		"Cannot find the device at address: ", 
-		address
+		addr
 	);
 
 	return nullptr;
 }
+

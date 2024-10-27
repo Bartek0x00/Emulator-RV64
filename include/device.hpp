@@ -10,8 +10,9 @@ namespace Emulator {
 		const uint64_t size;
 		const std::string_view name;
 
-		virtual inline uint64_t load(uint64_t addr) = 0;
-		virtual inline void store(uint64_t addr, uint64_t value) = 0;
+		virtual uint64_t load(uint64_t addr) = 0;
+		virtual void store(uint64_t addr, uint64_t value) = 0;
+		virtual void tick(void);
 
 		virtual ~Device() = default;
 	};

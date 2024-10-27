@@ -16,7 +16,7 @@ namespace Emulator {
 			uint64_t _size,
 		) : base(_base), size(_size), name("DRAM") 
 		{
-			data.resize(size);	
+			data.reserve(size);	
 		}
 
 		explicit inline Dram(

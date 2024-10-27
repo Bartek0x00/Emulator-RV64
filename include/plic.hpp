@@ -6,26 +6,25 @@
 
 namespace Emulator {
 	class Plic : public Device {
-	private:
-		
+	private:		
 		using Region<S> = std::array<uint32_t, S>;
 
 		Region<1024> priority;
-		constexpr priority_base = 0xC000000;
-		constexpr priority_size = 0xFFF;
+		constexpr uint64_t PRIORITY_BASE = 0xC000000;
+		constexpr uint64_t PRIORITY_SIZE = 0xFFF;
 
 		Region<32> pending;
-		constexpr pending_base = 0xC001000;
-		constexpr pending_size = 0x7F;
+		constexpr uint64_t PENDING_BASE = 0xC001000;
+		constexpr uint64_t PENDING_SIZE = 0x7F;
 
 		Region<64> enable;
-		constexpr enable_base = 0xC002000;
-		constexpr enable_size = 0xFF;
+		constexpr uint64_t ENABLE_BASE = 0xC002000;
+		constexpr uint64_t ENABLE_SIZE = 0xFF;
 
 		Region<2> treshold;
 		Region<2> claim;
-		constexpr treshold_claim_base = 0xC200000;
-		constexpr treshold_claim_size = 0x1007;
+		constexpr uint64_t TRESHOLD_CLAIM_BASE = 0xC200000;
+		constexpr uint64_t TRESHOLD_CLAIM_SIZE = 0x1007;
 	
 	public:
 		explicit inline Plic(void) : \
@@ -50,89 +49,16 @@ namespace Emulator {
 		inline void clear_pending(uint64_t irq)
 		{
 			pending[irq / 4] &= ~(1U << irq);
-
 			update_claim(0);
 		}
 
 		inline void update_pending(uint64_t irq)
 		{
 			pending[irq / 4] |= 1U << irq;
-
 			update_claim(irq);
 		}
 		
-		inline uint64_t load(uint64_t addr) override
-		{
-			if (addr >= priority_base && 
-				addr <= priority_base + priority_size)
-			{
-				return priority[(addr - priority_base) / 4];
-			}
-
-			if (addr >= pending_base &&
-				addr <= pending_base + pending_size)
-			{
-				return pending[(addr - pending_base) / 4];
-			}
-
-			if (addr >= enable_base &&
-				addr <= enable_base + enable_size)
-			{
-				return enable[(addr - enable_base) / 4];
-			}
-
-			if (addr >= treshold_claim_base &&
-				addr <= treshold_claim_base + treshold_claim_size)
-			{
-				uint64_t ctx = (addr - treshold_claim_base) / 0x1000ULL;
-				uint64_t off = addr - (treshold_claim_base + 0x1000ULL * ctx);
-				
-				if (off == 0)
-					return treshold[ctx];
-				else if (off == 4)
-					return claim[ctx];
-			}
-
-			error<FAIL>(
-				name,
-				": Cannot access region at the address: ",
-				addr
-			);
-			
-			return 0;
-		}
-		
-		inline void store(uint64_t addr, uint64_t value)
-		{
-			if (addr >= priority_base &&
-				addr <= priority_base + priority_size)
-			{
-				priority[(addr - priority_base) / 4] = value;
-			}
-
-			if (addr >= pending_base &&
-				addr <= pending_base + pending_size)
-			{
-				pending[(addr - pending_base) / 4] = value;
-			}
-
-			if (addr >= enable_base &&
-				addr <= enable_base + enable_size)
-			{
-				enable[(addr - enable_base) / 4] = value;
-			}
-
-			if (addr >= treshold_claim_base &&
-				addr <= treshold_claim_base + treshold_claim_size)
-			{
-				uint64_t ctx = (addr - treshold_claim_base) / 0x1000ULL;
-				uint64_t off = addr - (treshold_claim_base + 0x1000ULL * ctx);
-
-				if (off == 0)
-					treshold[ctx] = value;
-				else if (off == 4)
-					clear_pending(value);
-			}
-		}
+		uint64_t load(uint64_t addr) override;	
+		void store(uint64_t addr, uint64_t value) override;
 	};
 };
