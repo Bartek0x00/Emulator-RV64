@@ -14,9 +14,6 @@ namespace Emulator {
 		template<typename T>
     	inline T& operator[](uint64_t index)
 		{
-			if (!index)
-				return static_cast<T&>(0);
-
 			if (index < U)
 				return regs[index];
 				
