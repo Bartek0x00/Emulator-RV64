@@ -1,28 +1,129 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include "errors.hpp"
 
 namespace Emulator {
 
-	template<typename T, uint64_t U>
-    class Registers {
+	template<uint64_t U>
+    class IRegisters {
 	private:
-    	T regs[U] = {0};
+		enum IRegisters : uint64_t {
+			x0 = 0, x1,  
+			x2,  x3,	 
+			x4,  x5,  
+			x6,  x7,  
+			x8,  x9,  
+			x10, x11, 
+			x12, x13, 
+			x14, x15, 
+			x16, x17, 
+			x18, x19, 
+			x20, x21, 
+			x22, x23, 
+			x24, x25, 
+			x26, x27, 
+			x28, x29, 
+			x30, x31,
+			zero = x0,
+			ra = x1,  sp = x2,
+			gp = x3,  tp = x4,
+			t0 = x5,  t1 = x6,
+			t2 = x7,  s0 = x8
+			fp = x8,  s1 = x9,  
+			a0 = x10, a1 = x11, 
+			a2 = x12, a3 = x13, 
+			a4 = x14, a5 = x15, 
+			a6 = x16, a7 = x17, 
+			s2 = x18, s3 = x19, 
+			s4 = x20, s5 = x21, 
+			s6 = x22, s7 = x23, 
+			s8 = x24, s9 = x25, 
+			s10 = x26, s11 = x27, 
+			t3 = x28, t4 = x29, 
+			t5 = x30, t6 = x31
+		};
+
+    	std::array<uint64_t, U> regs;
 
     public:
-		template<typename T>
-    	inline T& operator[](uint64_t index)
+    	explicit constexpr inline IRegisters(void) : regs{};
+
+		inline uint64_t& operator[](IRegisters index)
 		{
 			if (index < U)
 				return regs[index];
 				
 			error<FAIL>(
-				"Register access out of bounds: ", 
+				"IRegister access out of bounds: ", 
 				index
 			);
 			
-			return static_cast<T&>(0);
+			return nullptr;
+		}
+	};
+
+	template<uint64_t U>
+	class FRegisters {
+	private:
+		enum FRegisters : uint64_t {
+			ft0 = 0, ft1,
+			ft2, ft3,
+			ft4, ft5,
+			ft6, ft7,
+			fs0, fs1,
+			fa0, fa1,
+			fa2, fa3,
+			fa4, fa5,
+			fa6, fa7,
+			fs2, fs3,
+			fs4, fs5,
+			fs6, fs7,
+			fs8, fs9,
+			fs10, fs11,
+			ft8, ft9,
+			ft10, ft11
+		};
+		
+		std::array<double, U> regs;
+
+	public:
+		explicit constexpr inline FRegisters(void) : regs{};
+
+		inline double& operator[](FRegisters index)
+		{
+			if (index < U)
+				return regs[index];
+
+			error<FAIL>(
+				"FRegister access out of bounds: ",
+				index
+			);
+
+			return nullptr;
+		}
+	};
+
+	template<uint64_t U>
+	class CRegisters {
+	private:
+		std::array<uint64_t, U> regs;
+	
+	public:
+		explicit constexpr inline CRegisters(void) : regs{};
+
+		inline uint64_t& operator[](CRegisters index)
+		{
+			if (index < U)
+				return regs[index];
+
+			error<FAIL>(
+				"CRegister access out of bounds: ",
+				index
+			);
+
+			return nullptr;
 		}
 	};
 };

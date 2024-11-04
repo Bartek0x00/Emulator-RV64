@@ -76,9 +76,70 @@ void render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
                 bg_color.g = cell.bg.rgb.green;
                 bg_color.b = cell.bg.rgb.blue;
             }
+			
+            if (cell.attrs.reverse)
+				std::swap(fg_color, bg_color);
 
-            
-        }
+			int style = TTF_STYLE_NORMAL;
+
+			if (cell.attrs.bold)
+				style |= TTF_STYLE_BOLD;
+        	
+			if (cell.attrs.underline)
+				style |= TTF_STYLE_UNDERLINE;
+
+			if (cell.attrs.italic)
+				style |= TTF_STYLE_ITALIC;
+
+			if (cell.attrs.strike)
+				style |= TTF_STYLE_STRIKETHROUGH;
+
+			SDL_Rect rect = {
+				.x = col * font_width,
+				.y = row * font_height,
+				.w = cell.width * font_width,
+				.h = cell.height * font_height
+			};
+
+			SDL_FillRect(
+				surface, &rect,
+				SDL_MapRGB(
+					surface->format, 
+					bg_color.r,
+					bg_color.g,
+					bg_color.b
+				)
+			);
+
+			if (ustr.length() > 0) {
+				std::string utf8;				
+				
+				UErrorCode status = U_ZERO_ERROR;
+				const icu::Normalizer2 *normalizer = 
+					icu::Normalizer2::getNFKCInstance(status);
+				
+				if (U_FAILURE(status))
+					error<FAIL>("Unable to get NFKC normalizer");
+				
+				UnicodeString& ustr_normalized = 
+					normalizer->normalize(ustr, status);
+				
+				if (U_SUCCESS(status))
+					ustr_normalized.toUTF8String(utf8);
+				else
+					ustr.toUTF8String(utf8);
+				
+				TTF_SetFontStyle(font, style);
+				SDL_Surface *text_surface = TTF_RenderUTF8_Blended(
+					font, utf8.c_str(), fg_color
+				);
+				SDL_SetSurfaceBlendMode(text_surface, SDL_BLENDMODE_BLEND);
+				SDL_BlitSurface(text_surface, nullptr, surface, &rect);
+				SDL_FreeSurface(text_surface);
+			}
+
+			matrix(row, col) = 0;
+		}
     }
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
