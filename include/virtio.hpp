@@ -1,7 +1,6 @@
 #pragma once
 
 #include <array>
-#include <limits>
 #include <vector>
 #include "device.hpp"
 #include "common.hpp"
@@ -45,8 +44,7 @@ namespace Emulator {
 			DRIVER_FEAT_SEL = 0x24,
 			GUEST_PAGE_SIZE = 0x28,
 			QUEUE_SEL		= 0x30,
-			QUEUE_NOTIFY_RESET = \
-				std::numeric_limits<uint32_t>::max(),
+			QUEUE_NOTIFY_RESET = (~0ULL) >> 32,
 			QUEUE_NUM_MAX	= 0x34,
 			QUEUE_NUM		= 0x38,
 			QUEUE_ALIGN		= 0x3c,
