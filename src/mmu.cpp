@@ -38,8 +38,8 @@ void Mmu::update(void)
 {
 	uint64_t satp = cpu.csr_regs[CRegs::Address::SATP];
 
-	this->mppn = read_bits(satp, 43, 0) << 12ULL;
-	this->mode = static_cast<ModeValue>(
+	mppn = read_bits(satp, 43, 0) << 12ULL;
+	mode = static_cast<ModeValue>(
 		read_bits(satp, 63, 60)
 	);
 
@@ -52,7 +52,7 @@ bool Mmu::fetch_pte(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode, T
 	uint64_t levels = get_levels();
 	constexpr uint64_t PTE_SIZE = 8;
 
-	uint64_t tmp = this->mppn;
+	uint64_t tmp = mppn;
 	int64_t i = levels - 1;
 
 	for (; i >= 0; i--) {
@@ -113,14 +113,14 @@ TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cp
 	uint64_t oldest_tlb_age = 0;
 	int oldest_tlb_index = 0;
 
-	for (int i = 0; i < this->tlb_cache.size(); i++) {
+	for (int i = 0; i < tlb_cache.size(); i++) {
 		TLBEntry& entry = tlb_cache[i];
 
 		if (addr_masked == entry.virt_base) {
 			entry.age = 0;
 
-			while (++i < this->tlb_cache.size())
-				++this->tlb_cache[i].age;
+			while (++i < tlb_cache.size())
+				++tlb_cache[i].age;
 
 			return &entry;
 		}
@@ -133,7 +133,7 @@ TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cp
 		oldest_tlb_index = i;
 	}
 
-	TLBEntry& entry = this->tlb_cache[oldest_tlb_index];
+	TLBEntry& entry = tlb_cache[oldest_tlb_index];
 	if (fetch_pte(addr, access_type, cpu_mode, entry)) {
 		entry.virt_base = addr_masked;
 		entry.age = 0;
@@ -145,7 +145,7 @@ TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cp
 
 uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 {
-	if (this->mode == Mode::BARE)
+	if (mode == Mode::BARE)
 		return addr;
 	
 	Cpu::Mode cpu_mode = cpu.mode;
@@ -172,11 +172,11 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 	if (!entry)
 		return 0;
 	
-	bool mxr = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::MXR);
-	bool sum = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::SUM);
+	bool mxr = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::MXR));
+	bool sum = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::SUM));
 
 	if ((!entry->is_read && entry->is_write && !entry->is_execute) ||
-		(!entry->is_read && entry->is_write && entry->is_execute) 
+		(!entry->is_read && entry->is_write && entry->is_execute)) 
 	{
 		set_cpu_error(addr, access_type);
 		return 0;
@@ -190,14 +190,14 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 		return 0;
 	}
 
-	if (!entry->is_user && (cpu_mode != Cpu::Mode::SUPERVISOR) {
+	if (!entry->is_user && (cpu_mode != Cpu::Mode::SUPERVISOR)) {
 		set_cpu_error(addr, access_type);
 		return 0;
 	}
 
 	switch (access_type) {
 	case AccessType::LOAD:
-		if (!(entry->is_read || (entry->is_execute && mxr)) {
+		if (!(entry->is_read || (entry->is_execute && mxr))) {
 			set_cpu_error(addr, access_type);
 			return 0;
 		}

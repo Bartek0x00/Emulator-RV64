@@ -3,9 +3,7 @@
 
 using namespace Emulator;
 
-Gpu::Gpu(uint32_t _width, uint32_t _height) :
-	width(_width), height(_height), 
-	channels(3), name("GPU")
+Gpu::Gpu(uint32_t width, uint32_t height)
 {
 	if (SDL_Init(SDL_INIT_VIDEO))
 		error<FAIL>(

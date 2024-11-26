@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string_view>
 #include "device.hpp"
 
 namespace Emulator {
@@ -12,6 +13,7 @@ namespace Emulator {
 		explicit Bus(void) = default;
 		
 		Device& find(uint64_t address) const;
+		Device& find(string_view name) const;
 
 		inline void operator+=(Device& device)
 		{

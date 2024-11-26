@@ -10,9 +10,6 @@ uint64_t Syscon::load(uint64_t addr)
 
 void Syscon::store(uint64_t addr, uint64_t value)
 {
-	if (value == POWEROFF_BASE ||
-		value == REBOOT_BASE)
-	{
-		throw std::exception();
-	}
+	if (value == POWEROFF_BASE || value == REBOOT_BASE)
+		error<FAIL>();
 }

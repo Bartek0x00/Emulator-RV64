@@ -110,6 +110,14 @@ namespace Emulator {
 		void store(uint64_t addr, uint64_t value) override;
 		void tick(void) override;
 
+		inline uint32_t *interrupting(void)
+		{
+			if (isr & 1)
+				return VIRTIO_IRQN;
+
+			return nullptr;
+		}
+
 		inline void reset(void)
 		{
 			id = 0;

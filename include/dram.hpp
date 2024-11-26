@@ -25,34 +25,7 @@ namespace Emulator {
 			std::vector<uint8_t> _data
 		) : Dram(_base, _size), data(std::move(_data)) {};
 		
-		inline uint64_t load(uint64_t addr) override
-		{
-			addr -= base;
-
-			if (addr < size)
-				return data[addr];
-				
-			error<FAIL>(
-				name,
-				": Cannot access data at address: ",
-				addr
-			);
-
-			return 0;
-		}
-
-		inline void store(uint64_t addr, uint64_t value) override
-		{
-			addr -= base;
-
-			if (addr < size)
-				data[addr] = value;
-
-			error<FAIL>(
-				name,
-				": Cannot access data at address: ",
-				addr
-			);
-		}
+		uint64_t load(uint64_t addr) override;
+		void store(uint64_t addr, uint64_t value) override;
 	};
 };

@@ -39,8 +39,6 @@ uint64_t Plic::load(uint64_t addr)
 		": Cannot access region at the address: ",
 		addr
 	);
-
-	return 0;
 }
 
 void Plic::store(uint64_t addr, uint64_t value)
@@ -74,4 +72,10 @@ void Plic::store(uint64_t addr, uint64_t value)
 		else if (off == 4)
 			clear_pending(value);
 	}
+
+	error<FAIL>(
+		name,
+		": Cannot write to region at the address: ",
+		addr
+	);
 }

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <cstdint>
+#include <optional>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "common.hpp"
@@ -80,8 +81,20 @@ namespace Emulator {
 		constexpr uint64_t UART_IRQN = 10;
 		bool is_uart_interrupting = false;
 		
-		explicit Gpu(uint32_t width, uint32_t height);
+		explicit Gpu(uint32_t _width, uint32_t _height) :
+			width(_width), height(_height), 
+			channels(3), name("GPU") {};
 
+		inline uint32_t *interrupting(void)
+		{
+			if (is_uart_interrupting) {
+				is_uart_interrupting = false;
+				return UART_IRQN;
+			}
+
+			return nullptr;
+		}
+		
 		uint64_t load(uint64_t addr) override;
 		void store(uint64_t addr, uint64_t value) override;
 		void tick(void) override;

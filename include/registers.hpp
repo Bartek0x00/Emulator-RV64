@@ -52,15 +52,13 @@ namespace Emulator {
 
 		inline uint64_t& operator[](IRegs index)
 		{
-			if (index < 32)
-				return regs[index];
-				
-			error<FAIL>(
-				"Integer Register access out of bounds: ", 
-				index
-			);
+			if (index >= 32)
+				error<FAIL>(
+					"Integer Register access out of bounds: ", 
+					index
+				);
 			
-			return nullptr;
+			return regs[index];
 		}
 	};
 
@@ -92,15 +90,13 @@ namespace Emulator {
 
 		inline double& operator[](FRegs index)
 		{
-			if (index < 32)
-				return regs[index];
+			if (index >= 32)
+				error<FAIL>(
+					"Float Register access out of bounds: ",
+					index
+				);
 
-			error<FAIL>(
-				"Float Register access out of bounds: ",
-				index
-			);
-
-			return nullptr;
+			return regs[index];
 		}
 	};
 
