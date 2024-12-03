@@ -33,6 +33,7 @@ namespace Emulator {
 		std::cerr << COLOR_NONE;
 	}
 
+	[[noreturn]]
 	template<typename... Args>
 	constexpr inline void error<FAIL>(Args&&... args)
 	{
