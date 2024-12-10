@@ -34,11 +34,7 @@ uint64_t Plic::load(uint64_t addr)
 			return claim[ctx];
 	}
 
-	error<FAIL>(
-		name,
-		": Cannot access region at the address: ",
-		addr
-	);
+	error<FAIL>("PLIC: Cannot access region at the address: ", addr);
 }
 
 void Plic::store(uint64_t addr, uint64_t value)
@@ -73,9 +69,17 @@ void Plic::store(uint64_t addr, uint64_t value)
 			clear_pending(value);
 	}
 
+	error<FAIL>("PLIC: Cannot write to region at the address: ", addr);
+}
+
+void Plic::dump(void) const
+{
 	error<FAIL>(
-		name,
-		": Cannot write to region at the address: ",
-		addr
+		"################################\n"
+		"#  Device: PLIC                #\n"
+		"################################",
+		"\n# base: ", base,
+		"\n# size: ", size,
+		"\n################################\n"
 	);
 }

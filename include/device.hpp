@@ -12,6 +12,7 @@ namespace Emulator {
 
 		virtual uint64_t load(uint64_t addr) = 0;
 		virtual void store(uint64_t addr, uint64_t value) = 0;
+		virtual void dump(void) const = 0;
 		virtual void tick(void);
 
 		virtual ~Device() = default;

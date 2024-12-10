@@ -27,3 +27,22 @@ Device& Bus::find(string_view name) const
 		name
 	);
 }
+
+void dump(void) const
+{
+	error<INFO>(
+		"\t################################\n"
+		"\t#      Devices dump start      #\n"
+		"\t################################\n"
+	);
+
+	for (const Device& device : devices) {
+		device.dump();
+	}
+
+	error<INFO>(
+		"\t################################\n"
+		"\t#       Devices dump end       #\n"
+		"\t################################\n"
+	);
+}

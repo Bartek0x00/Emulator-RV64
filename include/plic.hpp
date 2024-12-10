@@ -28,8 +28,8 @@ namespace Emulator {
 	
 	public:
 		explicit inline Plic(void) : \
-			base(0xC000000ULL), 
-			size(0x208000ULL),
+			base(0xC000000), 
+			size(0x208000),
 			name("PLIC") {};
 
 		inline bool is_enabled(uint64_t ctx, uint64_t irq)
@@ -60,5 +60,6 @@ namespace Emulator {
 		
 		uint64_t load(uint64_t addr) override;	
 		void store(uint64_t addr, uint64_t value) override;
+		void dump(void) const override;
 	};
 };

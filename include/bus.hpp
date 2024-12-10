@@ -7,15 +7,16 @@
 namespace Emulator {
 	class Bus {
 	private:
-		std::vector<Device&> devices;
+		std::vector<Device*> devices;
 
 	public:
 		explicit Bus(void) = default;
 		
 		Device& find(uint64_t address) const;
 		Device& find(string_view name) const;
+		void dump(void) const;
 
-		inline void operator+=(Device& device)
+		inline void add(Device& device)
 		{
 			devices.push_back(device);
 		}

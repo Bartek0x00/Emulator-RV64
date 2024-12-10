@@ -145,6 +145,19 @@ void Virtio::store(uint64_t addr. uint64_t value)
 	}
 }
 
+void Virtio::dump(void) const
+{
+	error<INFO>(
+		"################################\n"
+		"#  Device: VIRTIO              #\n"
+		"################################"
+		"\n# base: ", base,
+		"\n# size: ", size,
+		"\n# status: ", status,
+		"\n################################\n"
+	);
+}
+
 void Virtio::tick(void)
 {
 	if (queue_notify != QUEUE_NOTIFY_RESET &&

@@ -16,5 +16,6 @@ namespace Emulator {
 
 		uint64_t load(uint64_t addr) override;
 		void store(uint64_t addr, uint64_t value) override;
+		void dump(void) const override;
 	};
 };

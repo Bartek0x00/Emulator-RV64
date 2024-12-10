@@ -5,29 +5,7 @@
 #include "device.hpp"
 #include "common.hpp"
 
-namespace Emulator {
-	struct VRingAvail {
-		uint16_t flags;
-		uint16_t idx;
-		uint16_t ring[];
-	};
-
-	struct VirtqDesc {
-		uint64_t addr;
-		uint32_t len;
-		uint16_t flags;
-		uint16_t next;
-	};
-
-	struct Virtq {
-		uint64_t desc;
-		uint64_t avail;
-		uint64_t used;
-
-		uint32_t num;
-		uint32_t align;
-	};
-	
+namespace Emulator {	
 	class Virtio : public Device {
 	private:
 		enum : uint64_t {
@@ -77,7 +55,29 @@ namespace Emulator {
 			BLK_T_OUT 		= 0x1,
 			BLK_S_OK  		= BLK_T_IN
 		};
-		
+	
+		struct VRingAvail {
+			uint16_t flags;
+			uint16_t idx;
+			uint16_t ring[];
+		};
+
+		struct VirtqDesc {
+			uint64_t addr;
+			uint32_t len;
+			uint16_t flags;
+			uint16_t next;
+		};
+
+		struct Virtq {
+			uint64_t desc;
+			uint64_t avail;
+			uint64_t used;
+
+			uint32_t num;
+			uint32_t align;
+		};
+
 		Virtq vq = {0};
 		std::vector<uint8_t> rfsimg;
 		std::array<uint32_t, 2> host_feat = {0};
@@ -108,6 +108,7 @@ namespace Emulator {
 
 		uint64_t load(uint64_t addr) override;
 		void store(uint64_t addr, uint64_t value) override;
+		void dump(void) const override;
 		void tick(void) override;
 
 		inline uint32_t *interrupting(void)

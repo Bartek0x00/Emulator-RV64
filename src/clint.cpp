@@ -72,17 +72,46 @@ void Clint::store(uint64_t addr, uint64_t value)
 	}
 }
 
-//TODO
+void Clint::dump(void) const
+{
+	error<INFO>(
+		"################################\n"
+		"#  Device: CLINT               #\n"
+		"################################"
+		"\n# base: ", base,
+		"\n# size: ", size,
+		"\n# msip: ", msip,
+		"\n# mtimecmp: ", mtimecmp,
+		"\n# mtime: ", mtime,
+		"\n################################"
+	);
+}
+
 void Clint::tick(void)
 {
 	mtime = get_milliseconds() * 1000;
-	cpu.csr_regs.store(Cpu::TIME, mtime);
+	cpu.csr_regs.store(CRegs::Address::TIME, mtime);
 
 	if (msip & 1)
-		cpu.csr_regs.write_bit(Cpu::MIP, Cpu::MSIP_BIT, 1);
+		cpu.csr_regs.store(
+			write_bit(
+				cpu.csr_regs.load(CRegs::Address::MIP), 
+				CRegs::Mask::MSIP_BIT, 1
+			)
+		);
 
 	if (mtime >= mtimecmp)
-		cpu.csr_regs.write_bit(Cpu::MIP, Cpu::MTIP_BIT, 1);
+		cpu.csr_regs.store(
+			write_bit(
+				cpu.csr_regs.load(CRegs::Address::MIP), 
+				CRegs::Mask::MTIP_BIT, 1
+			)
+		);
 	else
-		cpu.csr_regs.write_bit(Cpu::MIP, Cpu::MTIP_BIT, 0);
+		cpu.csr_regs.store(
+			write_bit(
+				cpu.csr_regs.load(CRegs::Address::MIP), 
+				CRegs::Mask::MTIP_BIT, 0
+			)
+		);
 }

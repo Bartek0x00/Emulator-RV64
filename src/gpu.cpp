@@ -224,6 +224,28 @@ void Gpu::store(uint64_t addr, uint64_t value)
 	}
 }
 
+void Gpu::dump(void) const
+{
+	error<INFO>(
+		"################################\n"
+		"#  Device: GPU                 #\n"
+		"################################",
+		"\n# base: ", base,
+		"\n# size: ", size,
+		"\n# last_msg: ", last_msg,
+		"\n# last_tick: ", ladt_tick,
+		"\n#\tframebuffer",
+		"\n# width: ", width,
+		"\n# height: ", height,
+		"\n# channels: ", channels,
+		"\n# size: ", fb_size,
+		"\n#\tterminal",
+		"\n# rows: ", term_rows,
+		"\n# cols: ", term_cols,
+		"\n################################\n"
+	);
+}
+
 void Gpu::uart_putchar(uint8_t ch)
 {
 	val = ch;

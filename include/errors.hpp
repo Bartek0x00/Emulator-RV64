@@ -20,7 +20,7 @@ namespace Emulator {
 	template<typename... Args>
 	constexpr inline void error<INFO>(Args&&... args)
 	{
-		(std::cerr << ... << std::forward<Args>(args)) << '\n';
+		(std::cerr << std::hex << ... << std::forward<Args>(args)) << '\n';
 	}
 
 	template<typename... Args>
@@ -28,7 +28,7 @@ namespace Emulator {
 	{
 		std::cerr << COLOR_WARN;
 
-		(std::cerr << ... << std::forward<Args>(args)) << '\n';
+		(std::cerr << std::hex << ... << std::forward<Args>(args)) << '\n';
 
 		std::cerr << COLOR_NONE;
 	}
@@ -39,7 +39,7 @@ namespace Emulator {
 	{
 		std::cerr << COLOR_FAIL;
 
-		(std::cerr << ... << std::forward<Args>(args)) << std::endl;
+		(std::cerr << std::hex << ... << std::forward<Args>(args)) << std::endl;
 
 		std::cerr << COLOR_NONE;
 
