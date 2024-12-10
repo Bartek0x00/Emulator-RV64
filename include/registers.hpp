@@ -82,6 +82,8 @@ namespace Emulator {
 			ft8, ft9,
 			ft10, ft11
 		};
+
+		enum class RoundingMode
 		
 		std::array<double, 32> regs;
 

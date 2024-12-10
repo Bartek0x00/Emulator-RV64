@@ -313,15 +313,149 @@ namespace Emulator {
 		
 		inline uint64_t fl_off(void) const {return }
 
-		inline uint64_t opcode(void) const {return insn & 0x7fU;}
-		inline uint64_t rd(void) const {return ((insn >> 7U) & 0x1fU);}
-		inline uint64_t rs1(void) const {return ((insn >> 15U) & 0x1fU);}
-		inline uint64_t rs2(void) const {return ((insn >> 20U) & 0x1fU);}
-		inline uint64_t rs3(void) const {return ((insn & 0xf8000000U) >> 27U);}
-		inline uint64_t funct2(void) const {return ((insn & 0x03000000U) >> 25U);}
-		inline uint64_t funct3(void) const {return ((insn >> 12U) & 0x7U);}
-		inline uint64_t funct5(void) const {return (funct7() & 0x7cU) >> 2U;}
-		inline uint64_t funct7(void) const {return (insn >> 25U) 0x7fU;}
-		inline uin
+		inline uint64_t opcode(void) const 
+		{
+			return insn & 0x7fU;
+		}
+
+		inline uint64_t rd(void) const
+		{
+			return (insn >> 7U) & 0x1fU;
+		}
+
+		inline uint64_t rs1(void) const 
+		{
+			return (insn >> 15U) & 0x1fU;
+		}
+
+		inline uint64_t rs2(void) const 
+		{
+			return (insn >> 20U) & 0x1fU;
+		}
+		
+		inline uint64_t rs3(void) const 
+		{
+			return (insn & 0xf8000000U) >> 27U;
+		}
+		
+		inline uint64_t funct2(void) const 
+		{
+			return (insn & 0x03000000U) >> 25U;
+		}
+		
+		inline uint64_t funct3(void) const 
+		{
+			return (insn >> 12U) & 0x7U;
+		}
+		
+		inline uint64_t funct5(void) const 
+		{
+			return (funct7() & 0x7cU) >> 2U;
+		}
+
+		inline uint64_t funct7(void) const 
+		{
+			return (insn >> 25U) 0x7fU;
+		}
+		
+		inline uint64_t imm_i(void) const 
+		{
+			return static_cast<int64_t>(insn & 0xfff00000U) >> 20U;
+		}
+
+		inline uint64_t imm_s(void) const
+		{
+			return (static_cast<int64_t>(insn & 0xfe000000U) >> 20U) | ((insin >> 7) & 0x1fU);
+		}
+
+		inline uint64_t imm_b(void) const
+		{
+			return (static_cast<int64_t>(insn & 0x80000000U) >> 19U) |
+				((insn & 0x80U) << 4U) | 
+				((insn >> 20U) & 0x7e0U) |
+				((insn >> 7U) & 0x1eU);  
+		}
+
+		inline uint64_t imm_u(void) const
+		{
+			return insn & 0xfffff999U;
+		}
+
+		inline uint64_t imm_j(void) const
+		{
+			return (static_cast<int64_t>(insn & 0x80000000U) >> 11U) |
+				(insn & 0xff000U) |
+				((insn >> 9U) & 0x800U) |
+				((insn >> 20U) & 0x7feU);
+		}
+
+		inline uint64_t fl_off(void) const
+		{
+			return static_cast<int64_t>(insn) >> 20;
+		}
+
+		inline uint64_t fs_off(void) const
+		{
+			return (dl_off() & 0xfe0U) | ((insn >> 7U) & 0x1fU);
+		}
+
+		inline uint64_t shamt(void) const
+		{
+			return imm_i() & 0x3fU;
+		}
+
+		inline uint64_t csr(void) const
+		{
+			return (insn & 0xfff00000U) >> 20U;
+		}
+
+		inline uint64_t size(void) const
+		{
+			switch(reinterpret_cast<OpcodeType>(opcode_c())) {
+			case COMPRESSED_QUANDRANT0:
+			case COMPRESSED_QUANDRANT1:
+			case COMPRESSED_QUANDRANT2:
+				return 2;
+			default:
+				return 4;
+			}
+		}
+
+		inline uint64_t opcode_c(void) const
+		{
+			return insn & 0x03U;
+		}
+
+		inline uint64_t rd_c(void) const
+		{
+			return ((insn >> 2U) & 0x07U) + 8U;
+		}
+
+		inline uint64_t rs1_c(void) const
+		{
+			return ((insn >> 7U) & 0x07U) + 8U;
+		}
+
+		inline uint64_t rs2_c(void) const
+		{
+			return ((insn >> 2U) & 0x07) + 8u;
+		}
+
+		inline uint64_t shamt_c(void) const
+		{
+			return ((insn >> 7U) & 0x20U) | ((insn >> 2U) & 0x1fU);
+		}
+
+		inline uint64_t funct2_c(void) const
+		{
+			return (insn >> 10U) & 0x3U;
+		}
+
+		inline uint64_t funct3_c(void) const
+		{
+			return (insn >> 13U) & 0x07U;
+		}
+
+		
 	};
 };
