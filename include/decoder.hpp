@@ -1,8 +1,10 @@
 #pragma once
 
+#include <string_view>
 #include <cstdint>
 #include <ostream>
-	
+#include "errors.hpp"
+
 namespace Emulator {	
 	class Decoder {
 	private:
@@ -42,7 +44,7 @@ namespace Emulator {
 			CSR = 0x73
 		};
 	
-		enum class LoadType : uint64_t {
+		enum class LdType : uint64_t {
 			LB = 0x00, 
 			LH = 0x01,
 			LW = 0x02, 
@@ -75,7 +77,7 @@ namespace Emulator {
 			SRAIW = 0x20
 		};
 	
-		enum class SType : uint64_t {
+		enum class StType : uint64_t {
 			SB = 0x00,
 			SH = 0x01,
 			SW = 0x02,
@@ -310,8 +312,6 @@ namespace Emulator {
 
 	public:
 		inline Decoder(uint32_t _insn) : insn(_insn) {};
-		
-		inline uint64_t fl_off(void) const {return }
 
 		inline uint64_t opcode(void) const 
 		{
@@ -456,6 +456,70 @@ namespace Emulator {
 			return (insn >> 13U) & 0x07U;
 		}
 
-		
+		inline uint64_t rounding_mode(void) const
+		{
+			return (insn >> 12U) & 0x3U;
+		}
+
+		inline void dump(void) const
+		{
+			string_view name;
+
+			switch (static_cast<OpcodeType>(opcode())) {
+			case OpcodeType::L: 		name = "LOAD"; 		break;
+			case OpcodeType::FENCE: 	name = "FENCE"; 	break;
+			case OpcodeType::AUIPC: 	name = "AUIPC"; 	break;
+			case OpcodeType::LUI: 		name = "LUI"; 		break;
+			case OpcodeType::JALR: 		name = "JALR"; 		break;
+			case OpcodeType::JAL: 		name = "JAL"; 		break;
+			case OpcodeType::I: 		name = "I"; 		break;
+			case OpcodeType::S: 		name = "STORE"; 	break;
+			case OpcodeType::R: 		name = "R"; 		break;
+			case OpcodeType::B: 		name = "B"; 		break;
+			case OpcodeType::FL: 		name = "FL"; 		break;
+			case OpcodeType::FS: 		name = "FS"; 		break;
+			case OpcodeType::FMADD: 	name = "FMADD"; 	break;
+			case OpcodeType::FMSUB: 	name = "FMSUB"; 	break;
+			case OpcodeType::FNMADD:	name = "FNMADD"; 	break;
+			case OpcodeType::FNMSUB:	name = "FNMSUB";	break;
+			case OpcodeType::FOTHER:	name = "FOTHER"; 	break;
+			case OpcodeType::I64: 		name = "I64"; 		break;
+			case OpcodeType::R64: 		name = "R64"; 		break;
+			case OpcodeType::CSR: 		name = "CSR"; 		break;
+			case OpcodeType::A:			name = "ATOMIC"; 	break;
+			default: 					name = "UNKNOWN" 	break;
+			}
+
+			if (size() == 2)
+				name = "COMPRESSED"
+
+			error<INFO>(
+				"################################\n"
+				"# Component: Decoder           #\n"
+				"################################"
+				"\n# insn: ", insn,
+				"\n# size: ", size(),
+				"\n# opcode: ", name, " (", opcode(), ") ",
+				"\n# opcode_c: ", " (", opcode_c(), ") ",
+				"\n# src r1: ", rs1(),
+				"\n# src r2: ", rs2(),
+				"\n# src r3: ", rs3(),
+				"\n# dst r: ", rd(),
+				"\n# imm_i: ", imm_i(),
+				"\n# imm_s: ", imm_s(),
+				"\n# imm_b: ", imm_b(),
+				"\n# imm_u: ", imm_u(),
+				"\n# imm_j: ", imm_j(),
+				"\n# funct2: ", funct2(),
+				"\n# funct3: ", funct3(),
+				"\n# funct5: ", funct5(),
+				"\n# funct7: ", funct7(),
+				"\n# funct2_c: ", funct2_c(),
+				"\n# funct3_c: ", funct3_c(),
+				"\n# shamt: ", shamt(),
+				"\n# csr: ", csr(),
+				"\n################################"
+			);
+		}
 	};
 };

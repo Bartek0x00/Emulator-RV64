@@ -9,9 +9,9 @@ namespace Emulator {
 		const uint64_t base;
 		const uint64_t size;
 		const std::string_view name;
-
-		virtual uint64_t load(uint64_t addr) = 0;
-		virtual void store(uint64_t addr, uint64_t value) = 0;
+		
+		virtual uint64_t load(uint64_t addr, uint64_t len) = 0;
+		virtual void store(uint64_t addr, uint64_t value, uint64_t len) = 0;
 		virtual void dump(void) const = 0;
 		virtual void tick(void);
 

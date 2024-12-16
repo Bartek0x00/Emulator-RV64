@@ -55,7 +55,7 @@ namespace Emulator {
 
 		inline uint32_t get_levels(void)
 		{
-			switch (this->mode) {
+			switch (mode) {
 			case Mode::SV39: return 3;
 			case Mode::SV48: return 4;
 			case Mode::SV57: return 5;
@@ -88,7 +88,7 @@ namespace Emulator {
 			for (int i = 0; i < get_levels(); i++)
 				ppn[i] = (pte >> (10ULL + i * 9ULL)) & 0x1ffULL;
 
-			switch (this->mode) {
+			switch (mode) {
 			case Mode::SV39:
 				ppn[2] = (pte >> 28) & 0x03ffffffULL;
 				break;
@@ -108,27 +108,27 @@ namespace Emulator {
 		{
 			switch (access_type) {
 			case AccessType::LOAD:
-				cpu.set_exception(exception::Exception::LOAD_PAGE_FAULT, addr);
+				cpu.set_exception(Exception::LOAD_PAGE_FAULT, addr);
 				break;
 			case AccessType::STORE:
-				cpu.set_exception(exception::Exception::STORE_PAGE_FAULT, addr);
+				cpu.set_exception(Exception::STORE_PAGE_FAULT, addr);
 				break;
 			case AccessType::INSTRUCTION:
-				cpu.set_exception(exception::Exception::INSTRUCTION_PAGE_FAULT, addr);
+				cpu.set_exception(Exception::INSTRUCTION_PAGE_FAULT, addr);
 				break;
 			}
 
 			flush_tlb();
 		}
-		
+
 		uint64_t translate(uint64_t addr, AccessType access_type);
 		bool fetch_pte(uint64_t addr, AccessType access_type, 
 			Cpu::Mode cpu_mode, TLBEntry& entry);
 		TLBEntry *get_tlb_entry(uint64_t addr, AccessType access_type,
 			Cpu::Mode cpu_mode);
-		uint64_t fetch(uint64_t addr);
-		uint64_t load(uint64_t addr);
-		void store(uint64_t addr, uint64_t value);
+		uint64_t load(uint64_t addr, uint64_t len);
+		void store(uint64_t addr, uint64_t value, uint64_t len);
+		uint64_t fetch(uint64_t addr, uint64_t len);
 		void update(void);
 	};
 };

@@ -3,35 +3,37 @@
 
 using namespace Emulator;
 
-uint64_t Mmu::fetch(uint64_t addr)
-{
-	uint64_t p_addr = translate(addr, AccessType::INSTRUCTION);
-	if (cpu.exc_val != exception::Exception::NONE)
-		return 0;
-	
-	uint64_t value = bus.load(p_addr);
-	if (cpu.exc_val == exception::Exception::LOAD_ACCESS_FAULT)
-		cpu.exc_val = exception::Exception::INSTRUCTION_ACCESS_FAULT;
-	
-	return value;
-}
-
-uint64_t Mmu::load(uint64_t addr)
+uint64_t Mmu::load(uint64_t addr, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::LOAD);
-	if (cpu.exc_val != exception::Exception::NONE)
+	
+	if (cpu.exc_val != Exception::NONE)
 		return 0;
 	
-	return bus.load(p_addr);
+	return bus.load(p_addr, len);
 }
 
-void Mmu::store(uint64_t addr, uint64_t value)
+void Mmu::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::STORE);
-	if (cpu.exc_val != exception::Exception::NONE)
+
+	if (cpu.exc_val != Exception::NONE)
 		return;
+
+	bus.store(p_addr, value, len);
+}
+
+uint64_t Mmu::fetch(uint64_t addr, uint64_t len)
+{
+	uint64_t p_addr = translate(addr, AccessType::INSTRUCTION);
+	if (cpu.exc_val != Exception::NONE)
+		return 0;
 	
-	bus.store(p_addr, value);
+	uint64_t value = bus.load(p_addr, len);
+	if (cpu.exc_val == Exception::LOAD_ACCESS_FAULT)
+		cpu.exc_val = Exception::INSTRUCTION_ACCESS_FAULT;
+	
+	return value;
 }
 
 void Mmu::update(void)
@@ -57,7 +59,7 @@ bool Mmu::fetch_pte(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode, T
 
 	for (; i >= 0; i--) {
 		entry.pte_addr = tmp + vpn[i] * PTE_SIZE;
-		entry.pte = bus.load(entry.pte_addr);
+		entry.pte = bus.load(entry.pte_addr, 64);
 		
 		entry.is_read = (entry.pte >> PteValue::READ) & 1;
 		entry.is_write = (entry.pte >> PteValue::WRITE) & 1;
@@ -153,7 +155,7 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 	if (access_type != AccessType::INSTRUCTION &&
 		read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS), CRegs::Mask::MPRV) == 1)
 	{
-		uint64_t mpp = read_bits(CRegs::Address::MSTATUS, 12, 11);
+		uint64_t mpp = read_bits(cpu.csr_regs.load(CRegs::Address::MSTATUS), 12, 11);
 		
 		switch (mpp) {
 		case Cpu::Mode::USER:
@@ -222,7 +224,7 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 			entry->is_dirty = true;
 		}
 
-		bus.store(entry->pte_addr, entry->pte);
+		bus.store(entry->pte_addr, entry->pte, 64);
 	}
 
 	return entry->phys_base | (address & 0xfffULL);

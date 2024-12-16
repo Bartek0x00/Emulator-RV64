@@ -18,7 +18,7 @@ namespace Emulator {
             MACHINE_EXTERNAL = 11,
         };
 
-        string_view get_name(InterruptValue int_value);
+        std::string_view get_name(InterruptValue int_value);
         InterruptValue get_pending(void);
         void process(InterruptValue int_value);
 

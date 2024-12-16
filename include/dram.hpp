@@ -25,8 +25,8 @@ namespace Emulator {
 			std::vector<uint8_t> _data
 		) : Dram(_base, _size), data(std::move(_data)) {};
 		
-		uint64_t load(uint64_t addr) override;
-		void store(uint64_t addr, uint64_t value) override;
+		uint64_t load(uint64_t addr, uint64_t len) override;
+		void store(uint64_t addr, uint64_t value, uint64_t len) override;
 		void dump(void) const override;
 	};
 };

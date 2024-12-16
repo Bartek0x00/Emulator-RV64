@@ -2,7 +2,7 @@
 
 using namespace Emulator;
 
-uint64_t Clint::load(uint64_t addr)
+uint64_t Clint::load(uint64_t addr, uint64_t len)
 {
 	uint64_t reg_value = 0;
 	uint64_t off = 0;
@@ -26,10 +26,11 @@ uint64_t Clint::load(uint64_t addr)
 		off = addr - MTIME_BASE;
 	}
 
-	return reg_value >> (off * 8ULL);
+	return (reg_value >> (off * 8ULL)) & 
+		((1ULL << len) - 1ULL);
 }
 
-void Clint::store(uint64_t addr, uint64_t value)
+void Clint::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	uint64_t reg_value = 0;
 	uint64_t off = 0;
@@ -52,8 +53,15 @@ void Clint::store(uint64_t addr, uint64_t value)
 		reg_value = mtime;
 		off = addr - MTIME_BASE;
 	}
+	
+	if (len != 64) {
+		uint64_t mask = (1ULL << len) - 1ULL;
 
-	reg_value = value;
+		reg_value &= ~(mask << (len * 8));
+		reg_value |= (value & mask) << (off * 8);
+	} else {
+		reg_value = value;
+	}
 
 	if (addr >= MSIP_BASE &&
 		addr <= MSIP_BASE + MSIP_SIZE)

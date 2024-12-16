@@ -1,23 +1,16 @@
 #pragma once
 
-#include <iostream>
-#include <exception>
+#include <string_view>
 #include "cpu.hpp"
 #include "bus.hpp"
+#include "mmu.hpp"
 
 namespace Emulator {
-
-	class Cpu;
 	class Bus;
-	
-	class Emulator {
-	private:
-		std::unique_ptr<Bus> bus;
-		std::unique_ptr<Cpu> cpu;
-		
-		void run(void);
-	
-	public:
-		explicit Emulator(const char *filepath);
-	};
+	class Cpu;
+	class Mmu;
+
+	std::unique_ptr<Bus> bus;
+	std::unique_ptr<Cpu> cpu;
+	std::unique_ptr<Mmu> mmu;
 };

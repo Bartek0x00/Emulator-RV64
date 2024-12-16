@@ -99,7 +99,7 @@ Gpu::~Gpu(void)
 	SDL_Quit();
 }
 
-uint64_t Gpu::load(uint64_t addr)
+uint64_t Gpu::load(uint64_t addr, uint64_t len)
 {
 	if (addr == FB_CHANNELS)
 		return channels;
@@ -110,8 +110,17 @@ uint64_t Gpu::load(uint64_t addr)
 	if (addr == TERM_DIMENSIONS)
 		return (term_rows << 16) | term_cols;
 	
-	if (addr >= FB_START && addr <= FB_START + fb_size)
-		return framebuffer[addr - FB_START];
+	if (addr >= FB_START && addr <= FB_START + fb_size) {
+		addr -= FB_START;
+
+		switch (len) {
+		case 8: return framebuffer[addr];
+		case 16: return *reinterpret_cast<uint16_t*>(framebuffer.get() + addr);
+		case 32: return *reinterpret_cast<uint32_t*>(framebuffer.get() + addr);
+		case 64: return *reinterpret_cast<uint64_t*>(framebuffer.get() + addr);
+		default: break;	
+		}
+	}
 	
 	if (addr >= UART_BASE && 
 		addr <= UART_BASE + UART_SIZE) 
@@ -139,7 +148,7 @@ uint64_t Gpu::load(uint64_t addr)
 	return 0;
 }
 
-void Gpu::store(uint64_t addr, uint64_t value)
+void Gpu::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	switch (addr) {
 	case FB_RENDER:
@@ -149,6 +158,9 @@ void Gpu::store(uint64_t addr, uint64_t value)
 	
 	case FB_DIMENSIONS:
 	{
+		if (len != 32)
+			return;
+
 		uint16_t new_width = value & 0xFFFF;
 		uint16_t new_height = (value >> 16) & 0xFFFF;
 
@@ -158,6 +170,9 @@ void Gpu::store(uint64_t addr, uint64_t value)
 
 	case TERM_DIMENSIONS:
 	{
+		if (len != 32)
+			return;
+
 		uint16_t new_cols = value & 0xFFFF;
 		uint16_t new_rows = (value >> 16) & 0xFFFF;
 
@@ -173,8 +188,15 @@ void Gpu::store(uint64_t addr, uint64_t value)
 		if (addr >= FB_START &&
 			addr <= FB_START + fb_size)
 		{
-			framebuffer[addr - FB_START] = value;
-			break;
+			addr -= FB_START;
+
+			switch (addr) {
+			case 8: framebuffer[addr] = value; break;
+			case 16: *reinterpret_cast<uint16_t*>(framebuffer.get() + addr) = value; break;
+			case 32: *reinterpret_cast<uint32_t*>(framebuffer.get() + addr) = value; break;
+			case 64: *reinterpret_cast<uint64_t*>(framebuffer.get() + addr) = value; break;
+			default: break;
+			}
 		}
 	
 		if (addr >= UART_BASE &&

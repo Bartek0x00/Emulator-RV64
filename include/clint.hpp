@@ -23,8 +23,8 @@ namespace Emulator {
 			size(0x10000),
 			name("CLINT")
 		
-		uint64_t load(uint64_t addr) override;
-		void store(uint64_t addr, uint64_t value) override;
+		uint64_t load(uint64_t addr, uint64_t len) override;
+		void store(uint64_t addr, uint64_t value, uint64_t len) override;
 		void dump(void) const override;
 		void tick(void) override;
 	};

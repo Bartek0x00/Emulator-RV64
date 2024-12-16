@@ -2,7 +2,7 @@
 
 using namespace Emulator;
 
-uint64_t Plic::load(uint64_t addr)
+uint64_t Plic::load(uint64_t addr, uint64_t len)
 {
 	if (addr >= PRIORITY_BASE &&
 		addr <= PRIORITY_BASE + PRIORITY_SIZE)
@@ -37,7 +37,7 @@ uint64_t Plic::load(uint64_t addr)
 	error<FAIL>("PLIC: Cannot access region at the address: ", addr);
 }
 
-void Plic::store(uint64_t addr, uint64_t value)
+void Plic::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	if (addr >= PRIORITY_BASE &&
 		addr <= PRIORITY_BASE + PRIORITY_SIZE)

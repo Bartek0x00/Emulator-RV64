@@ -2,19 +2,19 @@
 
 using namespace Emulator;
 
-string_view Interrupt::get_name(InterruptValue int_value)
+std::string_view Interrupt::get_name(InterruptValue int_value)
 {
     switch (value) {
-    case USER_SOFTWARE: return "UserSoftware";
-    case SUPERVISOR_SOFTWARE: return "SupervisorSoftware";
-    case MACHINE_SOFTWARE: return "MachineSoftware";
-    case USER_TIMER: return "UserTimer";
-    case SUPERVISOR_TIMER: return "SupervisorTimer";
-    case MACHINE_TIMER: return "MachineTimer";
-    case USER_EXTERNAL: return "UserExternal";
-    case SUPERVISOR_EXTERNAL: return "SupervisorExternal";
-    case MACHINE_EXTERNAL: return "MachineExternal";
-    default: return "UnknownInterrupt";
+    case USER_SOFTWARE: 		return "UserSoftware";
+    case SUPERVISOR_SOFTWARE:	return "SupervisorSoftware";
+    case MACHINE_SOFTWARE: 		return "MachineSoftware";
+    case USER_TIMER: 			return "UserTimer";
+    case SUPERVISOR_TIMER: 		return "SupervisorTimer";
+    case MACHINE_TIMER: 		return "MachineTimer";
+    case USER_EXTERNAL: 		return "UserExternal";
+    case SUPERVISOR_EXTERNAL: 	return "SupervisorExternal";
+    case MACHINE_EXTERNAL: 		return "MachineExternal";
+    default: 					return "UnknownInterrupt";
     }
 }
 
@@ -50,11 +50,11 @@ InterruptValue Interrupt::get_pending(void)
 
     uint32_t *irqn;
 
-    irqn = bus.find("GPU").interrupting();
-    irqn = bus.find("VIRTIO").interrupting();
+    irqn = bus["GPU"].interrupting();
+    irqn = bus["VIRTIO"].interrupting();
 
     if (irqn) {
-        cpu.find("PLIC").update_pending(*irqn);
+        bus["PLIC"].update_pending(*irqn);
         cpu.csr_regs.store(
             CRegs::Address::MIP, 
             write_bit(

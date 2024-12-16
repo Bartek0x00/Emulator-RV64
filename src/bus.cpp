@@ -2,7 +2,7 @@
 #include "bus.hpp"
 #include "errors.hpp"
 
-Device& Bus::find(uint64_t addr) const
+Device& Bus::operator[](uint64_t addr) const
 {
 	for (const Device& device : devices) {
 		if (addr >= device.base && addr < device.base + device.size)
@@ -15,7 +15,7 @@ Device& Bus::find(uint64_t addr) const
 	);
 }
 
-Device& Bus::find(string_view name) const
+Device& Bus::operator[](string_view name) const
 {
 	for (const Device& device : devices) {
 		if (name == device.name)

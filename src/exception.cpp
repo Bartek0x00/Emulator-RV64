@@ -2,24 +2,24 @@
 
 using namespace Emulator;
 
-string_view Exception::get_name(ExceptionValue exc_val)
+std::string_view Exception::get_name(ExceptionValue exc_val)
 {
     switch (exc_val) {
-    case INSTRUCTION_ADDRESS_MISALIGNED: return "InstructionAddressMisaligned";
-    case INSTRUCTION_ACCESS_FAULT: return "InstructionAccessFault";
-    case ILLEGAL_INSTRUCTION: return "IllegalInstruction";
-    case BREAKPOINT: return "Breakpoint";
-    case LOAD_ADDRESS_MISALIGNED: return "LoadAddressMisaligned";
-    case LOAD_ACCESS_FAULT: return "LoadAccessFault";
-    case STORE_ADDRESS_MiSALIGNED: return "StoreAddressMisaligned";
-    case STORE_ACCESS_FAULT: return "StoreAccessFault";
-    case ECALL_UMODE: return "ECallUmode";
-    case ECALL_SMODE: return "ECallSmode";
-    case ECALL_MMODE: return "ECallMmode";
-    case INSTRUCTION_PAGE_FAULT: return "InstructionPageFault";
-    case LOAD_PAGE_FAULT: return "LoadPageFault";
-    case STORE_PAGE_FAULT: return "StorePageFault";
-    default: return "UnknownException";
+    case INSTRUCTION_ADDRESS_MISALIGNED:	return "InstructionAddressMisaligned";
+    case INSTRUCTION_ACCESS_FAULT: 			return "InstructionAccessFault";
+    case ILLEGAL_INSTRUCTION: 				return "IllegalInstruction";
+    case BREAKPOINT: 						return "Breakpoint";
+    case LOAD_ADDRESS_MISALIGNED: 			return "LoadAddressMisaligned";
+    case LOAD_ACCESS_FAULT: 				return "LoadAccessFault";
+    case STORE_ADDRESS_MiSALIGNED: 			return "StoreAddressMisaligned";
+    case STORE_ACCESS_FAULT: 				return "StoreAccessFault";
+    case ECALL_UMODE: 						return "ECallUmode";
+    case ECALL_SMODE: 						return "ECallSmode";
+    case ECALL_MMODE: 						return "ECallMmode";
+    case INSTRUCTION_PAGE_FAULT: 			return "InstructionPageFault";
+    case LOAD_PAGE_FAULT: 					return "LoadPageFault";
+    case STORE_PAGE_FAULT: 					return "StorePageFault";
+    default: 								return "UnknownException";
     }
 }
 

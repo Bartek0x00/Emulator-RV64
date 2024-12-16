@@ -31,47 +31,50 @@ void Virtio::update(void)
 VirtqDesc Virtio::load_desc(uint64_t addr)
 {
 	return {	
-		.addr = bus.load(addr);
-		.len = bus.load(addr + 8);
-		.flags = bus.load(addr + 12);
-		.next = bus.load(addr + 14);
+		.addr = bus.load(addr, 64);
+		.len = bus.load(addr + 8, 32);
+		.flags = bus.load(addr + 12, 16);
+		.next = bus.load(addr + 14, 16);
 	};
 }
 
 void Virtio::access_disk(void)
 {
 	uint16_t idx = bus.load(
-		vq.avail + offsetof(VRingAvail, idx)
+		vq.avail + offsetof(VRingAvail, idx),
+		16
 	);
 	
 	uint16_t desc_off = bus.load(
-		vq.avail + 4 + ((idx & vq.num) * 2)
+		vq.avail + 4 + ((idx & vq.num) * 2),
+		16
 	);
 
 	VirtqDesc desc0 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc_off);
 	VirtqDesc desc1 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc0.next);
 	VirtqDesc desc2 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc1.next);
 
-	uint32_t blk_req_type = bus.load(desc0.addr);
-	uint64_t blk_req_sector = bus.load(desc0.addr + 8);
+	uint32_t blk_req_type = bus.load(desc0.addr, 32);
+	uint64_t blk_req_sector = bus.load(desc0.addr + 8, 64);
 
 	if (blk_req_type == BLK_T_OUT)
 		for (uint32_t i = 0; i < desc1.len; i++)
 			rfsimg[blk_req_sector * SECTOR_SIZE + i] = 
-				bus.load(desc1.addr + 1);
+				bus.load(desc1.addr + 1, 8);
 	else
 		for (uint32_t i = 0; i < desc1.len; i++)
 			bus.store(
 				desc1.addr + i,
-				rfsimg[blk_req_sector * SECTOR_SIZE + i]
+				rfsimg[blk_req_sector * SECTOR_SIZE + i],
+				8
 			);
 	
-	bus.store(desc2.addr, BLK_S_OK);
-	bus.store(vq.used + 4 + ((id % vq.num) * 8), desc_off);
-	bus.store(vq.used + 2, ++id);
+	bus.store(desc2.addr, BLK_S_OK, 8);
+	bus.store(vq.used + 4 + ((id % vq.num) * 8), desc_off, 16);
+	bus.store(vq.used + 2, ++id, 16);
 }
 
-uint64_t Virtio::load(uint64_t addr)
+uint64_t Virtio::load(uint64_t addr, uint64_t len)
 {
 	addr -= base;
 
@@ -79,20 +82,20 @@ uint64_t Virtio::load(uint64_t addr)
 		return config[addr - CONFIG];
 
 	switch (addr) {
-	case MAGIC_VALUE: return MAGIC;
-	case VERSION: return VERSION_LEGACY;
-	case DEVICE_ID: return BLK_DEV;
-	case VENDOR_ID: return VENDOR;
-	case DEVICE_FEAT: return host_feat[host_feat_sel];
-	case QUEUE_NUM_MAX: return VQUEUE_MAX_SIZE;
-	case QUEUE_PFN: return queue_pfn;
-	case INTERRUPT_STATUS: return isr;
-	case STATUS: return status;
-	default: return 0;
+	case MAGIC_VALUE: 		return MAGIC;
+	case VERSION: 			return VERSION_LEGACY;
+	case DEVICE_ID: 		return BLK_DEV;
+	case VENDOR_ID: 		return VENDOR;
+	case DEVICE_FEAT: 		return host_feat[host_feat_sel];
+	case QUEUE_NUM_MAX: 	return VQUEUE_MAX_SIZE;
+	case QUEUE_PFN: 		return queue_pfn;
+	case INTERRUPT_STATUS: 	return isr;
+	case STATUS: 			return status;
+	default: 				return 0;
 	};
 }
 
-void Virtio::store(uint64_t addr. uint64_t value)
+void Virtio::store(uint64_t addr. uint64_t value, uint64_t len)
 {
 	addr -= base;
 

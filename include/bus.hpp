@@ -12,23 +12,23 @@ namespace Emulator {
 	public:
 		explicit Bus(void) = default;
 		
-		Device& find(uint64_t address) const;
-		Device& find(string_view name) const;
+		Device& operator[](uint64_t addr) const;
+		Device& operator[](std::string_view name) const;
 		void dump(void) const;
 
-		inline void add(Device& device)
+		inline void add(Device *device)
 		{
 			devices.push_back(device);
 		}
-
-		inline uint64_t load(uint64_t addr)
+		
+		inline uint64_t load(uint64_t addr, uint64_t len)
 		{
-			return find(addr).load(addr);
+			return operator[](addr).load(addr, len);
 		}
 
-		inline void store(uint64_t addr, uint64_t value)
+		inline void store(uint64_t addr, uint64_t value, uint64_t len)
 		{
-			find(addr).store(addr);
+			operator[](addr).store(addr, value, len);
 		}
 	};
 };
