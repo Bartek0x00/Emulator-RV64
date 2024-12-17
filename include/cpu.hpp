@@ -15,7 +15,8 @@ namespace Emulator {
         IRegs int_regs;
         FRegs flt_regs;
         CRegs csr_regs;
-    
+        uint64_t pc;
+        
     public:
 		explicit Cpu(void);
     };

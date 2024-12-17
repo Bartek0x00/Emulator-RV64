@@ -184,7 +184,7 @@ namespace Emulator {
 			MAXU = 0x1c
 		};
 		
-		enum class CType : uint64_t {
+		enum class CSRType : uint64_t {
 			ENVIRONMENT = 0x00,
 			CSRW = 0x01,
 			CSRS = 0x02,
@@ -307,6 +307,51 @@ namespace Emulator {
 			FMV = 0x00,
 			FCLASS = 0x01
 		}
+
+		enum class Q0 : uint64_t {
+			ADDI4SPN = 0x00,
+        	FLD = 0x01,
+    		LW = 0x02,
+        	LD = 0x03,
+        	RESERVED = 0x04,
+        	FSD = 0x05,
+        	SW = 0x06,
+        	SD = 0x07,
+		};
+
+		enum class Q1 : uint64_t {
+			ADDI = 0x00,
+        	ADDIW = 0x01,
+        	LI = 0x02,
+
+        	OP03 = 0x03,
+        	OP04 = 0x04,
+
+        	J = 0x05,
+        	BEQZ = 0x06,
+        	BNEZ = 0x07,
+
+			NOP = 0x00,
+        	ADDI16SP = 0x02,
+        	LUI = 0x03
+
+			SRLI = 0x00,
+            SRAI = 0x01,
+            ANDI = 0x02,
+		};
+
+		enum class Q2 : uint64_t {
+			SLLI = 0x00,
+    		FLDSP = 0x01,
+        	LWSP = 0x02,
+        	LDSP = 0x03,
+
+        	OP04 = 0x04,
+
+        	FSDSP = 0x05,
+        	SWSP = 0x06,
+        	SDSP = 0x07,
+		};
 	
 		const uint32_t insn;
 

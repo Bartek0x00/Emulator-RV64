@@ -165,12 +165,12 @@ void Interrupt::process(InterruptValue int_value)
         cpu.mode = Cpu::Mode::SUPERVISOR;
 
         uint64_t stvec_val = cpu.cregs.load(CRegs::Address::STVEC);
-        uint64_t vt_offset = 0;
+        uint64_t vt_off = 0;
 
         if (stvec_val & 1)
-            vt_offset = int_val * 4;
+            vt_off = int_val * 4;
 
-        cpu.pc = (stvec_val & ~3ULL) + vt_offset;
+        cpu.pc = (stvec_val & ~3ULL) + vt_off;
         cpu.csr_regs.store(CRegs::Address::SEPC, (pc & ~1ULL));
         cpu.csr_regs.store(CRegs::Address::SCAUSE, (1ULL << 63ULL) | int_val);
         cpu.csr_regs.store(CRegs::Address::STVAL, 0);
@@ -207,12 +207,12 @@ void Interrupt::process(InterruptValue int_value)
         cpu.mode = Cpu::Mode::MACHINE;
 
         uint64_t mtvec_val = cpu.csr_regs.load(CRegs::Address::MTVEC);
-        uint64_t vt_offset = 0;
+        uint64_t vt_off = 0;
 
         if (mtvec_val & 1)
-            vt_offset = int_val * 4;
+            vt_off = int_val * 4;
 
-        cpu.pc = (mtvec_val & ~3ULL) + vt_offset;
+        cpu.pc = (mtvec_val & ~3ULL) + vt_off;
         cpu.csr_regs.store(CRegs::Address::MEPC, (pc & ~1ULL));
         cpu.csr_regs.store(CRegs::Address::MCAUSE, (1ULL << 63ULL) | int_val);
         cpu.csr_regs.store(CRegs::Address::MTVAL, 0);

@@ -8,7 +8,10 @@ using Emulator::Decoder;
 uint64_t execute(Decoder decoder)
 {
 	if (decoder.insn == 0) {
-		cpu.set_exception(Exception::ILLEGAL_INSTRUCTION, decoder.insn);
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION, 
+			decoder.insn
+		);
 		error<FAIL>("Illegal instruction");
 	}
 	
@@ -104,11 +107,521 @@ uint64_t execute(Decoder decoder)
 	return decoder.size();
 }
 
+namespace C {
+
+static void quadrant0(Decoder decoder)
+{
+	switch (static_cast<Q0>(decoder.funct3_c())) {
+	case Q0::ADDI4SPN:
+		C::addi4spn(decoder);
+		break;
+	case Q0::FLD:
+		C::fld(decoder);
+		break;
+	case Q0::LW:
+		C::lw(decoder);
+		break;
+	case Q0::LD:
+		C::ld(decoder);
+		break;
+	case Q0::RESERVED:
+		C::reserved(decoder);
+		break;
+	case Q0::FSD:
+		C::fsd(decoder);
+		break;
+	case Q0::SW:
+		C::sw(decoder);
+		break;
+	case Q0::SD:
+		C::sd(decoder);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_EXCEPTION,
+			decoder.insn
+		);
+	}
+}
+
+static void quadrant1(Decoder decoder)
+{
+	switch (static_cast<Q1>(decoder.funct3_c())) {
+	case Q1::ADDI:
+		C::addi(decoder);
+		break;
+	case Q1::ADDIW:
+		C::addiw(decoder);
+		break;
+	case Q1::LI:
+		C::li(decoder);
+		break;
+	case Q1::OP03:
+		switch (static_cast<Q1>(decoder.rd())) {
+		case Q1::NOP:
+			break;
+		case Q1::ADDI16SP:
+			C::addi16sp(decoder);
+			break;
+		default:
+			C::lui(decoder);
+			break;
+		}
+	case Q1::OP04:
+		switch (static_cast<Q1>(decoder.funct2_c())) {
+		case Q1::SRLI:
+			C::srli(decoder);
+			break;
+		case Q1::SRAI:
+			C::srai(decoder);
+			break;
+		case Q1::OP03:
+			C::op3(decoder);
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+	case Q1::J:
+		C::j(decoder);
+		break;
+	case Q1::BEQZ:
+		C::beqz(decoder);
+		break;
+	case Q1::BNEZ:
+		C::bnez(decoder);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+static void quadrant2(Decoder decoder)
+{
+	switch (static_cast<Q2>(decoder.funct3_c())) {
+	case Q2::SLLI:
+		C::slli(decoder);
+		break;
+	case Q2::FLDSP:
+		C::fldsp(decoder);
+		break;
+	case Q2::LWSP:
+		C::lwsp(decoder);
+		break;
+	case Q2::LDSP:
+		C::ldsp(decoder);
+		break;
+	case Q2::OP4:
+		C::op4(decoder);
+		break;
+	case Q2::FSDSP:
+		C::fsdsp(decoder);
+		break;
+	case Q2::SWSP:
+		C::swsp(decoder);
+		break;
+	case Q2::SDSP:
+		C::sdsp(decoder);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION, 
+			decoder.insn
+		);
+		break;
+	}
+}
+
+static void addi4spn(Decoder decoder)
+{
+    uint64_t rd = decoder.rd_c();
+    uint64_t imm = ((decoder.insn >> 1U) & 0x3c0U) | ((decoder.insn >> 7U) & 0x30U) |
+                   ((decoder.insn >> 2U) & 0x08U) | ((decoder.insn >> 4U) & 0x04U);
+
+    uint64_t val = cpu.int_regs[IRegs::sp] + imm;
+
+    cpu.int_regs[rd] = val;
+}
+
+static void fld(Decoder decoder)
+{
+    uint64_t rd = decoder.rd_c();
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | ((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+
+    cpu.flt_regs[rd] = mmu.load(addr, 64);
+}
+
+static void lw(Decoder decoder)
+{
+    uint64_t rd = decoder.rd_c();
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t off = ((decoder.insn << 1U) & 0x40u) | ((decoder.insn >> 7U) & 0x38U) |
+                      ((decoder.insn >> 4U) & 0x04U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+
+    cpu.int_regs[rd] = static_cast<int64_t>(mmu.load(addr, 32));
+}
+
+static void ld(Decoder decoder)
+{
+    uint64_t rd = decoder.rd_c();
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | ((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+
+    cpu.int_regs[rd] = mmu.load(addr, 64);
+}
+
+static void reserved(Decoder decoder)
+{
+    cpu.set_exception(
+		Exception::ILLEGAL_INSTRUCTION, 
+		decoder.insn
+	);
+}
+
+static void fsd(Decoder decoder)
+{
+    uint64_t rd = decoder.rd_c();
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | ((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+    uint64_t rs1_bits = cpu.flt_regs[rs1];
+
+    mmu.store(addr, rs1_bits, 64);
+}
+
+static void sw(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t rs2 = decoder.rs2_c();
+    uint64_t off = ((decoder.insn << 1U) & 0x40U) | ((decoder.insn >> 7U) & 0x38U) |
+                	((decoder.insn >> 4U) & 0x04U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+    uint32_t val = cpu.int_regs[rs2];
+
+    mmu.store(addr, val, 32);
+}
+
+static void sd(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t rs2 = decoder.rs2_c();
+    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | ((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[rs1] + off;
+    uint64_t val = cpu.int_regs[rs2];
+
+    mmu.store(addr, val, 64);
+}
+
+static void andi(Decoder decoder)
+{
+    uint64_t rd = decoder.rs1_c();
+    uint64_t imm = ((decoder.insn >> 7U) & 0x20U) | ((decoder.insn >> 2U) & 0x1fU);
+
+    if (imm & 0x20U)
+        imm = static_cast<int64_t>(imm | 0xc0U);
+
+    cpu.int_regs[rd] &= imm;
+}
+
+static void op3(Decoder decoder)
+{
+	uint32_t val1 = (decoder.insn >> 12U) & 0x01U;
+	uint32_t val2 = (decoder.insn >> 5U) & 0x03U;
+
+	uint64_t rd = decoder.rs1_c();
+	uint64_t rs2 = decoder.rs2_c();
+
+	if (val1) {
+		switch (val2) {
+		case 0:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				cpu.int_regs[rd] - cpu.int_regs[rs2]
+			);
+			break;
+		case 1:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				cpu.int_regs[rd] + cpu.int_regs[rs2]
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+	} else {
+		switch (val2) {
+		case 0:
+			cpu.int_regs[rd] -= cpu.int_regs[rs2];
+			break;
+		case 1:
+			cpu.int_regs[rd] ^= cpu.int_regs[rs2];
+			break;
+		case 2:
+			cpu.int_regs[rd] |= cpu.int_regs[rs2];
+			break;
+		case 3:
+			cpu.int_regs[rd] &= cpu.int_regs[rs2];
+			break;
+		default:
+			break;
+		}
+	}
+}
+
+static void addi(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t imm = ((decoder.insn >> 7U) & 0x20U) | ((decoder.insn >> 2U) & 0x1fU);
+
+    if (imm & 0x20)
+        imm = static_cast<int64_t>(imm | 0xc0U);
+
+    cpu.int_regs[rd] += imm;
+}
+
+static void addiw(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t imm = ((decoder.insn >> 7U) & 0x20U) | ((decoder.insn >> 2U) & 0x1fU);
+
+    if (imm & 0x20)
+        imm = static_cast<int64_t>(imm | 0xc0U);
+
+    cpu.int_regs[rd] = static_cast<int64_t>(cpu.int_regs[rd] + imm);
+}
+
+static void li(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t imm = ((decoder.insn >> 7U) & 0x20U) | ((decoder.insn >> 2U) & 0x1fU);
+
+    if (imm & 0x20)
+        imm = static_cast<int64_t>(imm | 0xc0U);
+
+    cpu.int_regs[rd] = imm;
+}
+
+static void addi16sp(Decoder decoder)
+{
+    uint64_t imm = ((decoder.insn >> 3U) & 0x200U) | ((decoder.insn >> 2U) & 0x10U) |
+                   ((decoder.insn << 1U) & 0x40U) | ((decoder.insn << 4U) & 0x180U) |
+                   ((decoder.insn << 3U) & 0x20U);
+
+    if (imm & 0x200)
+        imm = static_cast<int64_t>(imm | 0xfc00U);
+
+    cpu.int_regs[IRegs::sp] += imm;
+}
+
+static void lui(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t imm = ((decoder.insn << 5U) & 0x20000U) | ((decoder.insn << 10U) & 0x1f000U);
+
+    if (imm & 0x20000U)
+        imm = static_cast<int64_t>(imm | 0xfffc0000U);
+
+    cpu.int_regs[rd] = imm;
+}
+
+static void srli(Decoder decoder)
+{
+    uint64_t rd = decoder.rs1_c();
+    uint64_t shamt = decoder.shamt_c();
+
+    cpu.int_regs[rd] >>= shamt;
+}
+
+static void srai(Decoder decoder)
+{
+    uint64_t rd = decoder.rs1_c();
+    uint64_t shamt = decoder.shamt_c();
+
+    cpu.int_regs[rd] = static_cast<int64_t>(cpu.int_regs[rd]) >> shamt;
+}
+
+static void j(Decoder decoder)
+{
+    uint64_t imm = ((decoder.insn >> 1U) & 0x800U) | ((decoder.insn << 2U) & 0x400U) |
+                   ((decoder.insn >> 1U) & 0x300U) | ((decoder.insn << 1U) & 0x80U) |
+                   ((decoder.insn >> 1U) & 0x40U) | ((decoder.insn << 3U) & 0x20U) |
+                   ((decoder.insn >> 7U) & 0x10U) | ((decoder.insn >> 2U) & 0xeU);
+
+    if (imm & 0x800U)
+        imm = static_cast<int64_t>(imm | 0xf000U);
+
+    cpu.pc += (imm - 2);
+}
+
+static void beqz(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t imm = ((decoder.insn >> 4U) & 0x100U) | ((decoder.insn << 1U) & 0xc0U) |
+                   ((decoder.insn << 3U) & 0x20U) | ((decoder.insn >> 7U) & 0x18U) |
+                   ((decoder.insn >> 2U) & 0x6U);
+
+    if (imm & 0x100)
+        imm = static_cast<int64_t>(imm | 0xfe00U);
+
+    if (!cpu.int_regs[rs1])
+        cpu.pc += (imm - 2);
+}
+
+static void bnez(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rs1_c();
+    uint64_t imm = ((decoder.insn >> 4U) & 0x100U) | ((decoder.insn << 1U) & 0xc0U) |
+                   ((decoder.insn << 3U) & 0x20U) | ((decoder.insn >> 7U) & 0x18U) |
+                   ((decoder.insn >> 2U) & 0x6U);
+
+    if (imm & 0x100)
+        imm = static_cast<int64_t>(imm | 0xfe00U);
+
+    if (cpu.int_regs[rs1])
+        cpu.pc += (imm - 2);
+}
+
+static void slli(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t shamt = decoder.shamt_c();
+
+    cpu.int_regs[rd] <<= shamt;
+}
+
+static void fldsp(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t off = ((decoder.insn << 4U) & 0x1c0U) | ((decoder.insn >> 7U) & 0x20U) |
+                      ((decoder.insn >> 2U) & 0x18U);
+
+    uint64_t val = mmu.load(cpu.int_regs[IRegs::sp] + off, 64);
+
+    cpu.flt_regs[rd] = reinterpret_cast<double>(val);
+}
+
+static void lwsp(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t off = ((decoder.insn << 4U) & 0xc0U) | ((decoder.insn >> 7U) & 0x20U) |
+                      ((decoder.insn >> 2U) & 0x1cU);
+
+    uint32_t val = mmu.load(cpu.int_regs[IRegs::sp] + off, 32);
+
+    cpu.int_regs[rd] = static_cast<int64_t>(val);
+}
+
+static void ldsp(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t off = ((decoder.insn << 4U) & 0x1c0U) | ((decoder.insn >> 7U) & 0x20U) |
+                      ((decoder.insn >> 2U) & 0x18U);
+
+    uint64_t val = mmu.load(cpu.int_regs[IRegs::sp] + off, 64);
+
+    cpu.int_regs[rd] = val;
+}
+
+static void jr(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rd();
+
+    cpu.pc = (cpu.int_regs[rs1] - 2);
+}
+
+static void mv(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
+
+    cpu.int_regs[rd] = cpu.int_regs[rs1];
+}
+
+static void ebreak(Decoder decoder)
+{
+    cpu.set_exception(
+		Exception::BREAKPOINT
+	);
+}
+
+static void jalr(Decoder decoder)
+{
+    uint64_t rs1 = decoder.rd();
+    uint64_t temp = cpu.pc + 2;
+
+    cpu.pc = (cpu.int_regs[rs1] - 2);
+    cpu.int_regs[IRegs::ra] = temp;
+}
+
+static void add(Decoder decoder)
+{
+    uint64_t rd = decoder.rd();
+    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
+
+    cpu.int_regs[rd] += cpu.int_regs[rs1];
+}
+
+static void fsdsp(Decoder decoder)
+{
+    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
+    uint64_t off = ((decoder.insn >> 1U) & 0x1c0U) | 
+					((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[IRegs::sp] + off;
+    uint64_t rs1_bits = reinterpret_cast<uint64_t>(cpu.flt_regs[rs1]);
+
+    mmu.store(addr, rs1_bits, 64);
+}
+
+static void swsp(Decoder decoder)
+{
+    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
+    uint64_t off = ((decoder.insn >> 1U) & 0xc0U) | 
+					((decoder.insn >> 7U) & 0x3cU);
+
+    uint64_t addr = cpu.int_regs[IRegs::sp] + off;
+    uint32_t val = cpu.int_regs[rs1];
+
+    mmu.store(addr, val, 32);
+}
+
+static void sdsp(Decoder decoder)
+{
+    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
+    uint64_t off = ((decoder.insn >> 1U) & 0x1c0U) | 
+					((decoder.insn >> 7U) & 0x38U);
+
+    uint64_t addr = cpu.int_regs[IRegs::sp] + off;
+    uint64_t val = cpu.int_regs[rs1];
+
+    mmu.store(addr, val, 64);
+}
+
+}; // namespace C
+
 namespace LD {
 
 static void funct3(Decoder decoder)
 {
-	switch (static_cast<LdType>(decoder.funct3()) {
+	switch (static_cast<LdType>(decoder.funct3())) {
 	case LdType::LB:
 		LD::lb(decoder);
 		break;
@@ -133,7 +646,7 @@ static void funct3(Decoder decoder)
 	default:
 		cpu.set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
-			decoder.insn()
+			decoder.insn
 		);
 		break;
 	}
@@ -238,6 +751,8 @@ static void LD::lwu(Decoder decoder)
 }
 
 }; // namespace LD
+
+namespace 
 
 namespace A {
 
@@ -454,7 +969,7 @@ static void amominuw(Decoder decoder)
 	uint64_t rs2 = decoder.rs2();
 	uint64_t rd = decoder.rd();
 
-	uint64_t addr = cpu.regs[rs1];
+	uint64_t addr = cpu.int_regs[rs1];
 	
 	uint32_t val1 = mmu.load(addr, 32);
 	uint32_t val2 = cpu.int_regs[rs2];
@@ -647,4 +1162,3 @@ static void amomaxud(Decoder decoder)
 
 }; // namespace A
 
-namespace 

@@ -22,7 +22,7 @@ void Virtio::update(void)
 	vq.avail = vq.desc + (vq.num * sizeof(VirtqDesc));
 	vq.used = align_up(
 		vq.avail + \
-		offsetof(VRingAvail, ring) + \
+		offof(VRingAvail, ring) + \
 		vq.num * sizeof(VRingAvail::ring[0]),
 		vq.align
 	);
@@ -41,7 +41,7 @@ VirtqDesc Virtio::load_desc(uint64_t addr)
 void Virtio::access_disk(void)
 {
 	uint16_t idx = bus.load(
-		vq.avail + offsetof(VRingAvail, idx),
+		vq.avail + offof(VRingAvail, idx),
 		16
 	);
 	
