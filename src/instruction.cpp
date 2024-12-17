@@ -2,8 +2,9 @@
 #include "instruction.hpp"
 
 using namespace Emulator;
-using namespace Emulator::Instruction;
 using Emulator::Decoder;
+
+namespace Instruction {
 
 uint64_t execute(Decoder decoder)
 {
@@ -36,7 +37,7 @@ uint64_t execute(Decoder decoder)
 			LD::funct3(decoder); 
 			break;
 		case OpcodeType::FENCE:
-			F::funct3(decoder);
+			O::fence(decoder);
 			break;
 		case OpcodeType::I:
 			I::funct3(decoder);
@@ -81,16 +82,16 @@ uint64_t execute(Decoder decoder)
 			R64::funct3(decoder);
 			break;
 		case OpcodeType::AUIPC:
-			AUIPC::auipc(decoder);
+			O::auipc(decoder);
 			break;
 		case OpcodeType::LUI:
-			LUI::lui(decoder);
+			O::lui(decoder);
 			break;
 		case OpcodeType::JAL:
-			JAL::jal(decoder);
+			O::jal(decoder);
 			break;
 		case OpcodeType::JALR:
-			JALR::jalr(decoder);
+			O::jalr(decoder);
 			break;
 		case OpcodeType::CSR:
 			CSR::funct3(decoder);
@@ -174,6 +175,9 @@ static void quadrant1(Decoder decoder)
 			break;
 		case Q1::SRAI:
 			C::srai(decoder);
+			break;
+		case Q1::ANDI:
+			C::andi(decoder);
 			break;
 		case Q1::OP03:
 			C::op3(decoder);
@@ -540,43 +544,27 @@ static void ldsp(Decoder decoder)
     cpu.int_regs[rd] = val;
 }
 
-static void jr(Decoder decoder)
+static void op4(Decoder decoder)
 {
-    uint64_t rs1 = decoder.rd();
+	uint32_t val1 = (decoder.insn >> 12U) & 0x01U;
+	uint32_t val2 = (decoder.insn >> 2U) & 0x1fU;
 
-    cpu.pc = (cpu.int_regs[rs1] - 2);
-}
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
 
-static void mv(Decoder decoder)
-{
-    uint64_t rd = decoder.rd();
-    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
-
-    cpu.int_regs[rd] = cpu.int_regs[rs1];
-}
-
-static void ebreak(Decoder decoder)
-{
-    cpu.set_exception(
-		Exception::BREAKPOINT
-	);
-}
-
-static void jalr(Decoder decoder)
-{
-    uint64_t rs1 = decoder.rd();
-    uint64_t temp = cpu.pc + 2;
-
-    cpu.pc = (cpu.int_regs[rs1] - 2);
-    cpu.int_regs[IRegs::ra] = temp;
-}
-
-static void add(Decoder decoder)
-{
-    uint64_t rd = decoder.rd();
-    uint64_t rs1 = (decoder.insn >> 2U) & 0x1fU;
-
-    cpu.int_regs[rd] += cpu.int_regs[rs1];
+	if (val1) {
+		if (val2)
+			cpu.int_regs[rd] = cpu.int_regs[rs1];
+		else
+			cpu.pc = (cpu.int_regs[rd] - 2);
+	} else {
+		if (val2)
+			cpu.int_regs[rd] += cpu.int_regs[rs1];
+		else {
+			cpu.pc = (cpu.int_regs[rd] - 2);
+			cpu.int_regs[IRegs::ra] = (cpu.pc + 2);
+		}
+	}
 }
 
 static void fsdsp(Decoder decoder)
@@ -752,7 +740,52 @@ static void LD::lwu(Decoder decoder)
 
 }; // namespace LD
 
-namespace 
+namespace B {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t val1 = cpu.int_regs[decoder.rs1()];
+	uint64_t val2 = cpu.int_regs[decoder.rs2()];
+	
+	int64_t val1_s = static_cast<int64_t>(val1);
+	int64_t val2_s = static_cast<int64_t>(val2);
+	int64_t imm = decoder.imm_b() - 4;
+
+	switch (static_cast<BType>(decoder.funct3())) {
+	case BType::BEQ:
+		if (val1_s == val2_s)
+			cpu.pc += imm;
+		break;
+	case BType::BNE:
+		if (val1_s != val2_s)
+			cpu.pc += imm;
+		break;
+	case BType::BLT:
+		if (val1_s < val2_s)
+			cpu.pc += imm;
+		break;
+	case BType::BGE:
+		if (val1_s >= val2_s)
+			cpu.pc += imm;
+		break;
+	case BType::BLTU:
+		if (val1 < val2)
+			cpu.pc += imm;
+		break;
+	case BType::BGEU:
+		if (val1 >= val2)
+			cpu.pc += imm;
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace B
 
 namespace A {
 
@@ -1162,3 +1195,53 @@ static void amomaxud(Decoder decoder)
 
 }; // namespace A
 
+namespace O {
+
+static void fence(Decoder decoder)
+{
+	
+}
+
+static void jal(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	int64_t imm = decoder.imm_j();
+
+	cpu.int_regs[rd] = cpu.pc + 4;
+	cpu.pc += imm - 4;
+}
+
+static void jalr(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	int64_t imm = decoder.imm_i();
+
+	uint64_t tmp = cpu.pc + 4;
+	
+	cpu.pc = ((cpu.int_regs[rs1] + imm) & ~1) - 4;
+	cpu.int_regs[rd] = tmp;
+}
+
+static void auipc(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	int64_t imm = static_cast<int64_t>(
+		decoder.insn & 0xfffff000U
+	);
+
+	cpu.int_regs[rd] = cpu.pc + imm;
+}
+
+static void lui(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+
+	cpu.int_regs[rd] = static_cast<int64_t>(
+		decoder.insn & 0xfffff000U
+	);
+}
+
+}; // namespace O
+
+}; // namespace Instruction
