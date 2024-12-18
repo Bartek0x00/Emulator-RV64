@@ -13,7 +13,7 @@ namespace Emulator {
 			COMPRESSED_QUANDRANT1 = 0x01,
 			COMPRESSED_QUANDRANT2 = 0x02,
 			
-			LOAD = 0x03,
+			LD = 0x03,
 			
 			FENCE = 0x0f,
 			
@@ -24,7 +24,7 @@ namespace Emulator {
 			JAL = 0x6f,
 			
 			I = 0x13,
-			S = 0x23,
+			ST = 0x23,
 			R = 0x33,
 			B = 0x63,
 			
@@ -93,46 +93,30 @@ namespace Emulator {
 			SR = 0x05,
 			ORREM = 0x06,
 			ANDREM = 0x07,
-		};
-	
-		enum class AddMulSub : uint64_t {
+
 			ADD = 0x00,
 			MUL = 0x01,
-			SUB = 0x20
-		};
-	
-		enum class SllMulh : uint64_t {
+			SUB = 0x20,
+
 			SLL = 0x00,
-			MULH = 0x01
-		};
-	
-		enum class SltMulhsu : uint64_t {
+			MULH = 0x01,
+
 			SLT = 0x00,
-			MULHSU = 0x01
-		};
-		
-		enum class SltuMulhu : uint64_t {
+			MULHSU = 0x01,
+
 			SLTU = 0x00,
-			MULHU = 0x01
-		};
-	
-		enum class XorDiv : uint64_t {
+			MULHU = 0x01,
+
 			XOR = 0x00,
-			DIV = 0x01
-		};
-	
-		enum class Sr : uint64_t {
+			DIV = 0x01,
+
 			SRL = 0x00,
 			DIVU = 0x01,
-			SRA = 0x20
-		};
-		
-		enum class OrRem : uint64_t {
+			SRA = 0x20,
+
 			OR = 0x00,
-			REM = 0x01
-		};
-	
-		enum class AndRemu : uint64_t {
+			REM = 0x01,
+
 			AND = 0x00,
 			REMU = 0x01
 		};
@@ -511,18 +495,18 @@ namespace Emulator {
 			string_view name;
 
 			switch (static_cast<OpcodeType>(opcode())) {
-			case OpcodeType::L: 		name = "LOAD"; 		break;
+			case OpcodeType::LD: 		name = "LOAD"; 		break;
 			case OpcodeType::FENCE: 	name = "FENCE"; 	break;
 			case OpcodeType::AUIPC: 	name = "AUIPC"; 	break;
 			case OpcodeType::LUI: 		name = "LUI"; 		break;
 			case OpcodeType::JALR: 		name = "JALR"; 		break;
 			case OpcodeType::JAL: 		name = "JAL"; 		break;
-			case OpcodeType::I: 		name = "I"; 		break;
-			case OpcodeType::S: 		name = "STORE"; 	break;
-			case OpcodeType::R: 		name = "R"; 		break;
-			case OpcodeType::B: 		name = "B"; 		break;
-			case OpcodeType::FL: 		name = "FL"; 		break;
-			case OpcodeType::FS: 		name = "FS"; 		break;
+			case OpcodeType::I: 		name = "IMM"; 		break;
+			case OpcodeType::ST: 		name = "STORE"; 	break;
+			case OpcodeType::R: 		name = "REGISTER"; 	break;
+			case OpcodeType::B: 		name = "BRANCH"; 	break;
+			case OpcodeType::FL: 		name = "FLT"; 		break;
+			case OpcodeType::FS: 		name = "FLTS"; 		break;
 			case OpcodeType::FMADD: 	name = "FMADD"; 	break;
 			case OpcodeType::FMSUB: 	name = "FMSUB"; 	break;
 			case OpcodeType::FNMADD:	name = "FNMADD"; 	break;

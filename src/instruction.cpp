@@ -609,27 +609,50 @@ namespace LD {
 
 static void funct3(Decoder decoder)
 {
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rd = decoder.rd();
+	int64_t imm = decoder.imm_i();
+	
+	uint64_t addr = cpu.int_regs[rs1] + imm;
+	
+	if (cpu.exc_val != Exception::NONE)
+		return;
+
 	switch (static_cast<LdType>(decoder.funct3())) {
 	case LdType::LB:
-		LD::lb(decoder);
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			mmu.load(addr, 8)
+		);
 		break;
 	case LdType::LH:
-		LD::lh(decoder);
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			mmu.load(addr, 16)
+		);
 		break;
 	case LdType::LW:
-		LD::lw(decoder);
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			mmu.load(addr, 32)
+		);
 		break;
 	case LdType::LD:
-		LD::ld(decoder);
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			mmu.load(addr, 64)
+		);
 		break;
 	case LdType::LBU:
-		LD::lbu(decoder);
+		cpu.int_regs[rd] = static_cast<uint64_t>(
+			mmu.load(addr, 8)
+		);
 		break;
 	case LdType::LHU:
-		LD::lhu(decoder);
+		cpu.int_regs[rd] = static_cast<uint64_t>(
+			mmu.load(addr, 16)
+		);
 		break;
 	case LdType::LWU:
-		LD::lwu(decoder);
+		cpu.int_regs[rd] = static_cast<uint64_t>(
+			mmu.load(addr, 32)
+		);
 		break;
 	default:
 		cpu.set_exception(
@@ -639,106 +662,298 @@ static void funct3(Decoder decoder)
 		break;
 	}
 }
-	
-static void LD::lb(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rs1] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<int64_t>(
-			mmu.load(addr, 8)
-		);
-}
-
-static void LD::lh(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rs1] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<int64_t>(
-			mmu.load(addr, 16)
-		);
-}
-
-static void LD::lw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rs1] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<int64_t>(
-			mmu.load(addr, 32)
-		);
-}
-
-static void LD::ld(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rs1] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<int64_t>(
-			mmu.load(addr, 64)
-		);
-}
-
-static void LD::lbu(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rd] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<uint64_t>(
-			mmu.load(addr, 8)
-		);
-}
-
-static void LD::lhu(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rd] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<uint64_t>(
-			mmu.load(addr, 16)
-		);
-}
-
-static void LD::lwu(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-	int64_t imm = decoder.imm_i();
-
-	uint64_t addr = cpu.int_regs[rd] + imm;
-
-	if (cpu.exc_val == Exception::NONE)
-		cpu.int_regs[rd] = static_cast<uint64_t>(
-			mmu.load(addr, 64)
-		);
-}
 
 }; // namespace LD
+
+namespace ST {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	int64_t imm = decoder.imm_s();
+
+	uint64_t addr = cpu.int_regs[rs1] + imm;
+	uint64_t value = cpu.int_regs[rs2];
+
+	switch (static_cast<StType>(decoder.funct3())) {
+	case StType::SB:
+		mmu.store(addr, value, 8);
+		break;
+	case StType::SH:
+		mmu.store(addr, value, 16);
+		break;
+	case StType::SW:
+		mmu.store(addr, value, 32);
+		break;
+	case StType::SD:
+		mmu.store(addr, value, 64);
+		break;
+	}
+}
+
+}; // namespace ST
+
+namespace R {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	
+	uint64_t uval1 = cpu.int_regs[rs1];
+	uint64_t uval2 = cpu.int_regs[rs2];
+
+	int64_t val1 = static_cast<int64_t>(uval1);
+	int64_t val2 = static_cast<int64_t>(uval2);
+	
+	std::int128_t lval1 = val1;
+	std::int128_t lval2 = val2;
+	
+	std::uint128_t ulval1 = uval1;
+	std::uint128_t ulval2 = uval2;
+
+	switch (static_cast<RType>(decoder.funct3())) {
+	case RType::ADDMULSUB:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::ADD:
+			cpu.int_regs[rd] = val1 + val2;
+			break;
+		case RType::MUL:
+			cpu.int_regs[rd] = val1 * val2;
+			break;
+		case RType::SUB:
+			cpu.int_regs[rd] = val1 - val2;
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::SLLMULH:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::SLL:
+			cpu.int_regs[rd] = val1 << val2;
+			break;
+		case RType::MULH:
+			cpu.int_regs[rd] = (lval1 * lval2) >> 64;
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::SLTMULHSU:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::SLT:
+			cpu.int_regs[rd] = val1 < val2;
+			break;
+		case RType::MULHSU:
+			ulval1 = static_cast<std::int128_t>(val1);
+			cpu.int_regs[rd] = (ulval1 * ulval2) >> 64;
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::SLTUMULHU:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::SLTU:
+			cpu.int_regs[rd] = uval1 < uval2;
+			break;
+		case RType::MULHU:
+			cpu.int_regs[rd] = (ulval1 * ulval2) >> 64;
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::XORDIV:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::XOR:
+			cpu.int_regs[rd] = uval1 ^ uval2;
+			break;
+		case RType::DIV:
+			switch (val2) {
+			case -1:
+				if (val1 == std::numeric_limits<int32_t>::min())
+					cpu.int_regs[rd] = val1;
+				break;
+			case 0:
+				cpu.int_regs[rd] = ~0ULL;
+				break;
+			default:
+				cpu.int_regs[rd] = val1 / val2;
+				break;
+			}
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::SR:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::SRL:
+			cpu.int_regs[rd] = uval1 >> uval2;
+			break;
+		case RType::DIVU:
+			if (val2)
+				cpu.int_regs[rd] = uval1 / uval2;
+			else
+				cpu.int_regs[rd] = ~0ULL;
+			break;
+		case RType::SRA:
+		{
+			int32_t hval1 = uval1;
+			cpu.int_regs[rd] = hval1 >> val2;
+			break;
+		}
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::ORREM:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::OR:
+			cpu.int_regs[rd] = uval1 | uval2;
+			break;
+		case RType::REM:
+			switch (val2) {
+			case -1:
+				if (val1 == std::numeric_limits<int64_t>::min())
+					cpu.int_regs[rd] = 0;
+				break;
+			case 0:
+				cpu.int_regs[rd] = val1;
+				break;
+			default:
+				cpu.int_regs[rd] = val1 % val2;
+				break;
+			}
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case RType::ANDREMU:
+		switch (static_cast<RType>(decoder.funct7())) {
+		case RType::AND:
+			cpu.int_regs[rd] = uval1 & uval2;
+			break;
+		case RType::REMU:
+			if (val2)
+				cpu.int_regs[rd] = uval1 % uval2;
+			else
+				cpu.int_regs[rd] = uval1;
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace R
+
+namespace I {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	int64_t imm = decoder.imm_i();
+	uint64_t uimm = static_cast<uint64_t>(imm);
+	uint32_t shamt = decoder.shamt();
+	
+	switch (static_cast<IType>(decoder.funct3()) {
+	case IType::ADDI:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] + imm;
+		break;
+	case IType::SLLI:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] << shamt;
+		break;
+	case IType::SLTI:
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			cpu.int_regs[rs1]
+		) < imm;
+		break;
+	case IType::SLTIU:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] < uimm;
+		break;
+	case IType::XORI:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] ^ uimm;
+		break;
+	case IType::SRI:
+		switch (static_cast<IType>(decoder.funct7() >> 1)) {
+		case IType::SRLI:
+			cpu.int_regs[rd] = cpu.int_regs[rs1] >> shamt;
+			break;
+		case IType::SRAI:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				cpu.int_regs[rs1]
+			) >> uimm; 
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case IType::ORI:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] | uimm;
+		break;
+	case IType::ANDI:
+		cpu.int_regs[rd] = cpu.int_regs[rs1] & uimm;
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace I
 
 namespace B {
 
@@ -870,9 +1085,7 @@ static void amoaddw(Decoder decoder)
 	int32_t val1 = mmu.load(addr, 32);
 	int32_t val2 = cpu.int_regs[rs2];
 
-	int32_t res = val1 + val2;
-
-	mmu.store(addr, val2, 32);
+	mmu.store(addr, val1 + val2, 32);
 	cpu.int_regs[rd] = static_cast<int64_t>(val1);
 }
 
