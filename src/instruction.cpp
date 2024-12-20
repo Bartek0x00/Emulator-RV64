@@ -955,6 +955,63 @@ static void funct3(Decoder decoder)
 
 }; // namespace I
 
+namespace I64 {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+
+	switch (static_cast<I64Type>(decoder.funct3())) {
+	case I64Type::ADDIW:
+	{
+		int64_t imm = decoder.imm_i();
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			cpu.int_regs[rs1] + imm
+		);
+		break;
+	}
+	case I64Type::SLLIW:
+	{
+		uint64_t shamt = decoder.shamt();
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			cpu.int_regs[rs1] << shamt;
+		);
+		break;
+	}
+	case I64Type::SRIW:
+	{
+		uint32_t shamt = decoder.shamt();
+		switch (static_cast<I64Type>(decoder.funct7())) {
+		case I64Type::SRLIW:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				static_cast<uint32_t>(rs1) >> shamt
+			);
+			break;
+		case I64Type::SRAIW:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				static_cast<int32_t>(rs1) >> shamt
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+		}
+		break;
+	}
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace I64
+
 namespace B {
 
 static void funct3(Decoder decoder)
