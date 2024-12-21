@@ -223,17 +223,17 @@ namespace Emulator {
         	UNDERFLOW = 0b00010,
         	OVERFLOW = 	0b00100,
         	DIVBYZERO = 0b01000,
-        	INVALID = 	0h10000,
+        	INVALID = 	0b10000,
 
-        	Mask = INEXACT | UNDERFLOW | \
+        	MASK = INEXACT | UNDERFLOW | \
 				OVERFLOW | DIVBYZERO | INVALID,
 		};
 
 		enum class FS : uint64_t {
-			OFF = 0,
-			INITIAL,
-			CLEAN,
-			DIRTY
+			OFF = 0x00,
+			INITIAL = 0x01,
+			CLEAN = 0x02,
+			DIRTY = 0x03
 		};
 
 		std::array<uint64_t, 4096> regs;

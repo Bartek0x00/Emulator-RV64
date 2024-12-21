@@ -892,6 +892,149 @@ static void funct3(Decoder decoder)
 
 }; // namespace R
 
+namespace R64 {
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+
+	switch (static_cast<R64Type>(decoder.funct3())) {
+	case R64Type::ADDSUBW:
+	{
+		uint64_t val1 = cpu.int_regs[rs1];
+		int64_t val2 = cpu.int_regs[rs2];
+
+		switch (static_cast<R64Type>(decoder.funct7())) {
+		case R64Type::ADDW:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val1 + val2
+			);
+			break;
+		case R64Type::MULW:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val1 * val2
+			);
+			break;
+		case R64Type::SUBW:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val1 - val2
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	}
+	case R64Type::DIVW:
+	{
+		int32_t val1 = cpu.int_regs[rs1];
+		int32_t val2 = cpu.int_regs[rs2];
+
+		switch (val2) {
+		case -1:
+			if (val1 == std::numeric_limits<int32_t>::min())
+				cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case 0:
+			cpu.int_regs[rd] = ~0ULL;
+			break;
+		default:
+			cpu.int_regs[rd] = static_cast<int64_t>(val1 / val2);
+			break;
+		}
+		break;
+	}
+	case R64Type::SLLW:
+	{
+		uint64_t val1 = cpu.int_regs[rs1];
+		uint64_t val2 = cpu.int_regs[rs2] & 0x1f;
+
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			val1 << val2
+		);
+		break;
+	}
+	case R64Type::SRW:
+		switch (static_cast<R64Type>(decoder.funct7())) {
+		case R64Type::SRLW:
+		{
+			uint32_t val1 = cpu.int_regs[rs1];
+			uint64_t val2 = cpu.int_regs[rs2] & 0x1f;
+
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val1 >> val2
+			);
+			break;
+		}
+		case R64Type::DIVUW:
+		{
+			uint32_t val1 = cpu.int_regs[rs1];
+			uint32_t val2 = cpu.int_regs[rs2];
+
+			if (val2)
+				cpu.int_regs[rd] = static_cast<int64_t>(
+					val1 / val2
+				);
+			else
+				cpu.int_regs[rd] = ~0ULL;
+
+			break;
+		}
+		case R64Type::SRAW:
+		{
+			int32_t val1 = cpu.int_regs[rs1];
+			uint64_t val2 = cpu.int_regs[rs2] & 0x1f;
+
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val1 >> val2
+			);
+			break;
+		}
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case R64Type::REMW:
+	{
+		int64_t val1 = static_cast<int32_t>(
+			cpu.int_regs[rs1]
+		);
+		int64_t val2 = cpu.int_regs[rs2];
+
+		cpu.int_regs[rd] = static_cast<int64_t>(
+			val1 % val2
+		);
+		break;
+	}
+	case R64Type::REMUW:
+	{
+		uint64_t val1 = cpu.int_regs[rs1];
+		int64_t val2 = cpu.int_regs[rs2];
+
+		cpu.int_regs[rd] = val1 % val2;
+		break;
+	}
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION, 
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace R64
+
 namespace I {
 
 static void funct3(Decoder decoder)
@@ -1012,6 +1155,430 @@ static void funct3(Decoder decoder)
 
 }; // namespace I64
 
+namespace FD {
+
+enum class FValue : uint64_t {
+	INF = 1 << 0,
+	NORMAL = 1 << 1,
+	SUBNORMAL = 1 << 2,
+	NEG_ZERO = 1 << 3,
+	POS_ZERO = 1 << 4,
+	POS_SUBNORMAL = 1 << 5,
+	POS_NORMAL = 1 << 6,
+	POS_INF = 1 << 7,
+	NAN_SIG = 1 << 8,
+	NAN_QUIET = 1 << 9
+};
+
+static void set_exceptions(void)
+{
+	int exceptions = std::fetestexcept(FE_ALL_EXCEPT);
+	
+	CRegs::FExcept current = CRegs::FExcept::INVALID;
+
+	if (exceptions & FE_DIVBYZERO)
+		current = CRegs::FExcept::DIVBYZERO;
+	
+	if (exceptions & FE_INEXACT)
+		current = CRegs::FExcept::INEXACT
+	
+	if (exceptions & FE_OVERFLOW)
+		current = CRegs::FExcept::OVERFLOW;
+
+	if (exceptions & FE_UNDERFLOW)
+		current = CRegs::FExcept::UNDERFLOW;
+	
+	if (current != CRegs::FExcept::INVALID)
+		cpu.csr_regs.store(
+			CRegs::Address::FFLAGS,
+			cpu.csr_regs.load(CRegs::Address::FFLAGS) |
+				current
+		);
+	
+	if (exceptions)
+		std::feclearexcept(FE_ALL_EXCEPT);
+}
+
+static inline bool is_fs(void)
+{
+	uint64_t fs = read_bits(
+		cpu.csr_regs.load(
+			CRegs::Address::MSTATUS
+		),
+		14, 13
+	);
+
+	if (static_cast<CRegs::FS>(fs) != FS::OFF)
+		return true;
+	
+	cpu.set_exception(
+		Exception::ILLEGAL_INSTRUCTION
+	);
+	return false;
+}
+
+static void fl(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+	
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t off = decoder.fl_off();
+
+	uint64_t addr = cpu.int_regs[rs1] + off;
+	uint64_t val;
+
+	switch (static_cast<FdType>(decoder.funct3())) {
+	case FdType::FLW:
+		val = mmu.load(addr, 32) | 0xffffffff00000000;
+		cpu.flt_regs[rd] = reinterpret_cast<double>(val);
+		break;
+	case FdType::FLD:
+		val = mmu.load(addr, 64);
+		cpu.flt_regs[rd] = reinterpret_cast<double>(val);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+static void fs(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+	
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t off = decoder.fs_off();
+
+	uint64_t addr = cpu.int_regs[rs1] + off;
+	uint64_t rs2f_bits = cpu.flt_regs[rs2];
+
+	switch (static_cast<FdType>(decoder.funct3())) {
+	case FdType::FSW:
+		mmu.store(addr, rs2f_bits, 32);
+		break;
+	case FdType::FSD:
+		mmu.store(addr, rs2f_bits, 64);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+static void fmadd(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+	
+	switch (static_cast<FdType>(decoder.funct2())) {
+	case FdType::FMADDS:
+		fmadds
+		break;
+	case FdType::FMADDD:
+		fmaddd
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+
+	set_exceptions();
+}
+
+static void fmsub(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+
+	switch (static_cast<FdType>(decoder.funct2())) {
+	case FdType::FMSUBS:
+		fmsubs
+		break;
+	case FdType::FMSUBD:
+		fmsubd
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION.
+			decoder.insn
+		);
+		break;
+	}
+
+	set_exceptions();
+}
+
+static void fnmadd(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+	
+	switch (static_cast<FdType>(decoder.funct2())) {
+	case FdType::FNMADDS:
+		fnmadds
+		break;
+	case FdType::FNMADDD:
+		fnmaddd
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+
+	set_exceptions();
+}
+
+static void fnmsub(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+
+	switch (static_cast<FdType>(decoder.funct2())) {
+	case FdType::FNMSUBS:
+		fnmsubs
+		break;
+	case FdType::FNMSUBD:
+		fnmsubd
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+
+	set_exceptions();
+}
+
+static void fother(Decoder decoder)
+{
+	if (!is_fs())
+		return;
+	
+	switch (static_cast<FdType>(decoder.funct7()) {
+	case FdType::FADDS:
+		fadds
+		break;
+	case FdType::FADDD:
+		faddd
+		break;
+	case FdType::FSUBS:
+		fsubs
+		break;
+	case FdType::FSUBD:
+		fsubd
+		break;
+	case FdType::FMULS:
+		fmuls
+		break;
+	case FdType::FMULD:
+		fmuld
+		break;
+	case FdType::FDIVS:
+		fdivs
+		break;
+	case FdType::FDIVD:
+		fdivd
+		break;
+	case FdType::FSNGJS:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FSGNJ:
+			fsgnjs
+			break;
+		case FdType::FSGNJN:
+			fsgnjns
+			break;
+		case FdType::FSGNJX:
+			fsgnjxs
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn			
+			);
+			break;
+		}
+		break;
+	case FdType::FSNGJD:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FSGNJ:
+			fsgnjd
+			break;
+		case FdType::FSGNJN:
+			fsgnjnd
+			break;
+		case FdType::FSGNJX:
+			fsgnjxd
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FMINMAXS:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::MIN:
+			fmins
+			break;
+		case FdType::MAX:
+			fmaxs
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FMINMAXD:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::MIN:
+			fmind
+			break;
+		case FdType::MAX:
+			fmaxd
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+		}
+		break;
+	case FdType::FCVTSD:
+		fcvtsd
+		break;
+	case FdType::FCVTDS:
+		fcvtds
+		break;
+	case FdType::FSQRTS:
+		fsqrts
+		break;
+	case FdType::FSQRTD:
+		fsqrtd
+		break;
+	case FdType::FCS:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FLE:
+			fles
+			break;
+		case FdType::FLT:
+			flts
+			break;
+		case FdType::FEQ:
+			feqs
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FCD:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FLE:
+			fled
+			break;
+		case FdType::FLT:
+			fltd
+			break;
+		case FdType::FEQ:
+			feqd
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FCVTS:
+		fcvtss
+		break;
+	case FdType::FCVTD:
+		fcvtsd
+		break;
+	case FdType::FCVTSW:
+		fcvtsw
+		break;
+	case FdType::FCVTDW:
+		fcvtdw
+		break;
+	case FdType::FMVXW:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FMV:
+			fmvs
+			break;
+		case FdType::FCLASS:
+			fclasss
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FMVXD:
+		switch (static_cast<FdType>(decoder.funct3())) {
+		case FdType::FMV:
+			fmvd
+			break;
+		case FdType::FCLASS:
+			fclassd
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case FdType::FMVWX:
+		fmvsx
+		break;
+	case FdType::FMVDX:
+		fmvdx
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+
+	set_exceptions();
+}
+
+}; // namespace FD
+
 namespace B {
 
 static void funct3(Decoder decoder)
@@ -1063,27 +1630,111 @@ namespace A {
 
 static void funct3(Decoder decoder)
 {
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t addr = cpu.int_regs[rs1];
+
 	switch (static_cast<AType>(decoder.funct3())) {
 	case AType::AMOW:
-
-		if (cpu.int_regs[decoder.rs1()] % 4)
+	{
+		if (cpu.int_regs[rs1] % 4)
 			cpu.set_exception(
-				Exception::INSTRUCTION_ADDRESS_MISALIGNED, 
+				Exception::INSTRUCTION_ADDRESS_MISALIGNED,
 				decoder.insn
 			);
 
+		int32_t val1 = mmu.load(addr, 32);
+		int32_t val2 = cpu.int_regs[rs2];
+
 		switch (static_cast<AType>(decoder.funct5())) {
-		case AType::ADD: 	amoaddw(decoder);	break;
-		case AType::SWAP: 	amoswapw(decoder); 	break;
-		case AType::LR: 	lrw(decoder); 		break;
-		case AType::SC: 	scw(decoder); 		break;
-		case AType::XOR: 	amoxorw(decoder); 	break;
-		case AType::OR: 	amoorw(decoder); 	break;
-		case AType::AND: 	amoandw(decoder); 	break;
-		case AType::MIN: 	amominw(decoder); 	break;
-		case AType::MAX: 	amomaxw(decoder); 	break;
-		case AType::MINU: 	amominuw(decoder);	break;
-		case AType::MAXU: 	amomaxuw(decoder); 	break;
+		case AType::ADD:
+			mmu.store(addr, val1 + val2, 32);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::SWAP:
+			mmu.store(addr, val2, 32);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::LR:
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			cpu.reservations.insert(addr);
+			break;
+		case AType::SC:
+			if (cpu.reservations.contains(addr)) {
+				cpu.reservations.erase(addr);
+				mmu.store(
+					addr, 
+					static_cast<uint32_t>(val2), 
+					32
+				);
+				cpu.int_regs[rd] = 0;
+			} else {
+				cpu.int_regs[rd] = 1;
+			}
+			break;
+		case AType::XOR:
+			mmu.store(
+				addr, 
+				static_cast<int64_t>(val1 ^ val2), 
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::OR:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(val1 | val2),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::AND:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(val1 & val2),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MIN:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(std::min(val1, val2)),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MAX:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(std::max(val1, val2)),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MINU:
+			mmu.store(
+				addr,
+				std::min(
+					static_cast<uint32_t>(val1),
+					static_cast<uint32_t>(val2)
+				),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MAXU:
+			mmu.store(
+				addr,
+				std::max(
+					static_cast<uint32_t>(val1),
+					static_cast<uint32_t>(val2)
+				),
+				32
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
 		default:
 			cpu.set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -1092,27 +1743,110 @@ static void funct3(Decoder decoder)
 			break;
 		}
 		break;
-	
+	}
 	case AType::AMOD:
 		
-		if (cpu.int_regs[decoder.rs1()] % 8)
+		if (cpu.int_regs[rs1] % 8)
 			cpu.set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
 				decoder.insn
 			);
+		
+		int64_t val1 = mmu.load(addr, 64);
+		int64_t val2 = cpu.int_regs[rs2];
 
 		switch (static_cast<AType>(decoder.funct5())) {
-		case AType::ADD:	amoaddd(decoder); 	break;
-		case AType::SWAP:	amoswapd(decoder);	break;
-		case AType::LR:		lrd(decoder); 		break;
-		case AType::SC: 	scd(decoder); 		break;
-		case AType::XOR: 	amoxord(decoder); 	break;
-		case AType::OR: 	amoord(decoder); 	break;
-		case AType::AND: 	amoandd(decoder); 	break;
-		case AType::MIN: 	amomind(decoder); 	break;
-		case AType::MAX: 	amomaxd(decoder); 	break;
-		case AType::MINU: 	amominud(decoder); 	break;
-		case AType::MAXU: 	amomaxud(decoder); 	break;
+		case AType::ADD:
+			mmu.store(
+				addr, 
+				static_cast<int64_t>(val1 + val2),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::SWAP:
+			mmu.store(addr, val2, 64);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::LR:
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			cpu.reservations.insert(addr);
+			break;
+		case AType::SC:
+			if (cpu.reservations.contains(addr)) {
+				cpu.reservations.erase(addr);
+				mmu.store(
+					addr,
+					static_cast<uint64_t>(val2),
+					64
+				);
+				cpu.int_regs[rd] = 0;
+			} else {
+				cpu.int_regs[rd] = 1;
+			}
+			break;
+		case AType::XOR:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(val1 ^ val2),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::OR:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(val1 | val2),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::AND:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(val1 & val2),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MIN:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(std::min(val1, val2)),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MAX:
+			mmu.store(
+				addr,
+				static_cast<int64_t>(std::max(val1, val2)),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MINU:
+			mmu.store(
+				addr,
+				std::min(
+					static_cast<uint64_t>(val1),
+					static_cast<uint64_t>(val2)
+				),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
+		case AType::MAXU:
+			mmu.store(
+				addr,
+				std::max(
+					static_cast<uint64_t>(val1),
+					static_cast<uint64_t>(val2)
+				),
+				64
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(val1);
+			break;
 		default:
 			cpu.set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -1131,339 +1865,545 @@ static void funct3(Decoder decoder)
 	}
 }
 
-static void amoaddw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, val1 + val2, 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoswapw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, val2, 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void lrw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-	int32_t val1 = mmu.load(addr, 32);
-	
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-	cpu.reservations.insert(addr);
-}
-
-static void scw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-	uint32_t val2 = cpu.int_regs[rs2];
-
-	if (cpu.reservations.contains(addr)) {
-		cpu.reservations.erase(addr);
-		mmu.store(addr, val2, 32);
-		cpu.int_regs[rd] = 0;
-	} else {
-		cpu.int_regs[rd] = 1;
-	}
-}
-
-static void amoxorw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 ^ val2), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoorw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 | val2), 32);
-	cpu.int_regs[rd] = static_cast<int32_t>(val1);
-}
-
-static void amoandw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 & val2), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amominw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::min(val1, val2)), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amomaxw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int32_t val1 = mmu.load(addr, 32);
-	int32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::max(val1, val2)), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amominuw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-	
-	uint32_t val1 = mmu.load(addr, 32);
-	uint32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, std::min(val1, val2), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amomaxuw(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	uint32_t val1 = mmu.load(addr, 32);
-	uint32_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, std::max(val1, val2), 32);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoaddd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	int64_t result = val1 + val2;
-
-	mmu.store(addr, result, 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoswapd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, val2, 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void lrd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-	int64_t val1 = mmu.load(addr, 64);
-
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-	cpu.reservations.insert(addr);
-}
-
-static void scd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-	uint64_t val2 = cpu.int_regs[rs2];
-
-	if (cpu.reservations.contains(addr)) {
-		cpu.reservations.erase(addr);
-		mmu.store(addr, val2, 64);
-		cpu.int_regs[rd] = 0;
-	} else {
-		cpu.int_regs[rd] = 1;
-	}
-}
-
-static void amoxord(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 ^ val2), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoord(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 | val2), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amoandd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(val1 & val2), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amomind(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::min(val1, val2)), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amomaxd(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	int64_t val1 = mmu.load(addr, 64);
-	int64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::max(val1, val2)), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amominud(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	uint64_t val1 = mmu.load(addr, 64);
-	uint64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::min(val1, val2)), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
-static void amomaxud(Decoder decoder)
-{
-	uint64_t rs1 = decoder.rs1();
-	uint64_t rs2 = decoder.rs2();
-	uint64_t rd = decoder.rd();
-
-	uint64_t addr = cpu.int_regs[rs1];
-
-	uint64_t val1 = mmu.load(addr, 64);
-	uint64_t val2 = cpu.int_regs[rs2];
-
-	mmu.store(addr, static_cast<int64_t>(std::max(val1, val2)), 64);
-	cpu.int_regs[rd] = static_cast<int64_t>(val1);
-}
-
 }; // namespace A
+
+namespace CSR {
+
+using op_t = std::function<
+	uint64_t(uint64_t, uint64_t)
+>;
+
+using handler_t = std::function<
+	void(Decoder, uint64_t, uint64_t, op_t)
+>;
+
+static void default_h(Decoder decoder, 
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+
+	cpu.csr_regs.store(csr, op(csr_val, rhs));
+	cpu.int_regs[rd] = csr_val;
+}
+
+static void readonly_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+
+	cpu.int_regs[rd] = csr_val;
+}
+
+static void priviledged_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	if (cpu.mode == Cpu::Mode::USER) {
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		return;
+	}
+
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+
+	cpu.csr_regs.store(csr, op(csr_val, rhs));
+	cpu.int_regs[rd] = csr_val;
+}
+
+static void enforced_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+	uint64_t opval = op(csr_val, rhs);
+
+	if (csr_val != opval) {
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		return;
+	}
+
+	cpu.int_regs[rd] = csr_val;
+}
+
+static void fcsr_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+	uint64_t fexceptions = cpu.csr_regs.load(
+		CRegs::Address::FFLAGS
+	) & CRegs::FExcept::MASK;
+
+	uint64_t op_val = op(csr_val | fexceptions, rhs);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FFLAGS,
+		cpu.csr_regs.load(CRegs::Address::FFLAGS) & 
+			~CRegs::FExcept::MASK
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FFLAGS,
+		cpu.csr_regs.load(CRegs::Address::FFLAGS) | 
+			op_val & CRegs::FExcept::MASK
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FCSR, 
+		op_val & 0xff
+	);
+	cpu.int_regs[rd] = csr_val & 0xff;
+}
+
+static void fflags_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+	uint64_t fexceptions = csr_val & CRegs::FExcept::MASK;
+	uint64_t op_val = op(fexceptions, rhs);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FFLAGS,
+		cpu.csr_regs.load(CRegs::Address::FFLAGS) &
+			~CRegs::FExcept::MASK
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FFLAGS,
+		cpu.csr_regs.load(CRegs::Address::FFLAGS) |
+			op_val & CRegs::FExcept::MASK
+	);
+	
+	uint64_t fcsr = cpu.csr_regs.load(CRegs::Address::FCSR);
+	fcsr &= ~CRegs::FExcept::MASK;
+	fcsr |= op_val & 0xff;
+	
+	cpu.csr_regs.store(CRegs::Address::FCSR, fcsr);
+	cpu.int_regs[rd] = csr_val & CRegs::FExcept::MASK;
+}
+
+static void frm_h(Decoder decoder,
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(CRegs::Address::FCSR);
+	csr_val >>= 5;
+	uint64_t op_val = op(csr_val, rhs);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FRM,
+		~Cpu::FPURoundingMode::MASK
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::FRM,
+		cpu.csr_regs.load(CRegs::Address::FRM) |
+			op_val & Cpu::FPURoundingMode::MASK
+	);
+
+	uint64_t fcsr = cpu.csr_regs.load(CRegs::Address::FCSR);
+	fcsr &= ~0xe0;
+	fcsr |= op_val << 5;
+	fcsr &= 0xff;
+
+	cpu.csr_regs.store(CRegs::Address::FCSR, fcsr);
+	cpu.int_regs[rd] = csr_val & Cpu::FPURoundingMode::MASK;
+}
+
+static void satp_h(Decoder decoder
+	uint64_t csr, uint64_t rhs, op_t op)
+{
+	if (cpu.csr_regs.read_bit_mstatus(CRegs::Mask::TVM))
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+	
+	uint64_t rd = decoder.rd();
+	uint64_t csr_val = cpu.csr_regs.load(csr);
+
+	cpu.csr_regs.store(csr, op(csr_val, rhs));
+	cpu.int_regs[rd] = csr_val;
+
+	mmu.update();
+}
+
+static std::array<handler_t, 4096> csr_handlers = [](void) {
+	std::array<handler_t, 4096> tmp{default_h};
+	
+	tmp[CRegs::Address::FCSR] = fcsr_h;
+	tmp[CRegs::Address::FFLAGS] = fflags_h;
+	tmp[CRegs::Address::FRM] = frm_h;
+	tmp[CRegs::Address::SATP] = satp_h;
+
+	tmp[CRegs::Address::MVENDORID] = readonly_h;
+	tmp[CRegs::Address::MARCHID] = readonly_h;
+	tmp[CRegs::Address::MIMPID] = readonly_h;
+	tmp[CRegs::Address::MHARTID] = readonly_h;
+	tmp[CRegs::Address::MISA] = readonly_h;
+	tmp[CRegs::Address::TDATA1] = readonly_h;
+
+	tmp[CRegs::Address::CYCLE] = enforced_h;
+	tmp[CRegs::Address::MSTATUS] = priviledged_h;
+
+	return tmp;
+}();
+
+static void sret(Decoder decoder)
+{
+	uint64_t tsr = read_bit(
+		cpu.csr_regs.load(CRegs::Address::MSTATUS),
+		CRegs::Mask::TSR
+	);
+	
+	if (tsr || cpu.mode == Cpu::Mode::USER) {
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		return;
+	}
+
+	cpu.pc = cpu.csr_regs.load(CRegs::Address::SEPC) - 4;
+	cpu.mode = static_cast<Cpu::Mode>(
+		read_bit(
+			cpu.csr_regs.load(CRegs::Address::SSTATUS),
+			CRegs::Mask::SPP
+		)
+	);
+
+	if (cpu.mode == Cpu::Mode::USER)
+		cpu.csr_regs.store(
+			CRegs::Address::MSTATUS,
+			write_bit(
+				cpu.csr_regs.load(
+					CRegs::Address::MSTATUS
+				),
+				CRegs::Mask::MPRV, 
+				0
+			)
+		);
+
+	cpu.csr_regs.store(
+		CRegs::Address::SSTATUS,
+		write_bit(
+			cpu.csr_regs.load(
+				CRegs::Address::SSTATUS
+			),
+			CRegs::Mask::SIE,
+			read_bit(
+				cpu.csr_regs.load(
+					CRegs::Address::SSTATUS
+				),
+				CRegs::Mask::SPIE
+			)
+		)
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::SSTATUS,
+		write_bit(
+			cpu.csr_regs.load(
+				CRegs::Address::SSTATUS
+			),
+			CRegs::Mask::SPIE, 
+			1
+		)
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::SSTATUS,
+		write_bit(
+			cpu.csr_regs.load(
+				CRegs::Address::SSTATUS
+			),
+			CRegs::Mask::SPP, 
+			Cpu::Mode::USER
+		)
+	);
+}
+
+static void mret(Decoder decoder)
+{
+	if (cpu.mode != Cpu::Mode::MACHINE) {
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		return;
+	}
+
+	cpu.pc = cpu.csr_regs.load(CRegs::Address::MEPC) - 4;
+	
+	Cpu::Mode mpp = read_bits(
+		cpu.csr_regs.load(
+			CRegs::Address::MSTATUS
+		), 
+		12, 11
+	);
+
+	switch (mpp) {
+	case Cpu::Mode::USER:
+	case Cpu::Mode::SUPERVISOR:
+	case Cpu::Mode::MACHINE:
+		cpu.mode = mpp;
+	default:
+		cpu.mode = Cpu::Mode::INVALID;
+	}
+
+	if (cpu.mode != Cpu::Mode::MACHINE)
+		cpu.csr_regs.store(
+			CRegs::Address::MSTATUS,
+			write_bit(
+				cpu.csr_regs.load(
+					CRegs::Address::MSTATUS
+				),
+				CRegs::Mask::MPRV,
+				0
+			)	
+		);
+	
+	cpu.csr_regs.store(
+		CRegs::Address::MSTATUS,
+		write_bit(
+			cpu.csr_regs.load(
+				CRegs::Address::MSTATUS
+			),
+			CRegs::Mask::MIE,
+			read_bit(
+				cpu.csr_regs.load(
+					CRegs::Address::MSTATUS
+				),
+				CRegs::Mask::MPIE
+			)
+		)
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::MSTATUS,
+		write_bit(
+			CRegs::Address::MSTATUS,
+			CRegs::Mask::MPIE,
+			1
+		)
+	);
+
+	cpu.csr_regs.store(
+		CRegs::Address::MSTATUS,
+		write_bits(
+			cpu.csr_regs.load(
+				CRegs::Address::MSTATUS
+			),
+			12, 11,
+			Cpu::Mode::USER
+		)
+	);
+}
+
+static void environment(Decoder decoder)
+{
+	uint64_t imm = decoder.rs2();
+	uint64_t funct7 = decoder.funct7();
+
+	switch (static_cast<CSRType>(funct7)) {
+	case CSRType::SFENCEVMA7:
+		if (read_bit(
+				cpu.csr_regs.load(CRegs::Address::MSTATUS), 
+				CRegs::Mask::TVM
+			) || cpu.mode == Cpu::Mode::USER)
+		{	
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+		}
+		mmu.update();
+		break;
+	case CSRType::HFENCEBVMA7:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	case CSRType::HFENCEGVMA7:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+
+	switch (static_cast<CSRType>(imm) {
+	case CSRType::ECALL:
+		switch (static_cast<Cpu::Mode>(cpu.mode) {
+		case Cpu::Mode::MACHINE:
+			cpu.set_exception(
+				Exception::ECallMMode,
+				cpu.pc
+			);
+			break;
+		case Cpu::Mode::SUPERVISOR:
+			cpu.set_exception(
+				Exception::ECallSMode,
+				cpu.pc
+			);
+			break;
+		case Cpu::Mode::USER:
+			cpu.set_exception(
+				Exception::ECallUMode,
+				cpu.pc
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case CSRType::EBREAK:
+		cpu.set_exception(
+			Exception::BREAKPOINT
+		);
+		break;
+	case CSRType::RET:
+		switch (static_cast<CSRType>(funct7)) {
+		case CSRType::URET7:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		case CSRType::SRET7:
+			sret(decoder);
+			break;
+		case CSRType::MRET7:
+			mret(decoder);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	case CSRType::WFI:
+		switch (static_cast<CSRType>(funct7)) {
+		case CSRType::WFI7:
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+static void funct3(Decoder decoder)
+{
+	uint64_t rs1 = decoder.rs1();
+	uint64_t csr = decoder.csr();
+	uint64_t rhs = cpu.int_regs[rs1];
+
+	switch (static_cast<CSRType>(decoder.funct3())) {
+	case CSRType::ENVIRONMENT:
+		environment(decoder);
+		break;
+	case CSRType::CSRW:
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return rhs;
+			}
+		);
+		break;
+	case CSRType::CSRS:
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return csr | rhs;
+			}
+		);
+		break;
+	case CSRType::CSRC:
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return csr & ~rhs;
+			}
+		);
+		break;
+	case CSRType::CSRWI:
+		rhs = rs1;
+
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return rhs;
+			}
+		);
+		break;
+	case CSRType::CSRSI:
+		rhs = rs1;
+
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return csr | rhs;
+			}
+		);
+		break;
+	case CSRType::CSRCI:
+		rhs = rs1;
+
+		csr_handlers[csr](
+			decoder,
+			csr,
+			rhs,
+			+[](uint64_t csr, uint64_t rhs) {
+				return csr & ~rhs;
+			}
+		);
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION,
+			decoder.insn
+		);
+		break;
+	}
+}
+
+}; // namespace CSR
 
 namespace O {
 

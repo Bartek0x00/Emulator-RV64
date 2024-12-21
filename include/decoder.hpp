@@ -127,16 +127,12 @@ namespace Emulator {
 			DIVW = 0x04,
 			SRW = 0x05,
 			REMW = 0x06,
-			REMUW = 0x07
-		};
-	
-		enum class AddSubW : uint64_t {
+			REMUW = 0x07,
+
 			ADDW = 0x00,
 			MULW = 0x01,
-			SUBW = 0x20
-		};
-	
-		enum class SrW : uint64_t {
+			SUBW = 0x20,
+
 			SRLW = 0x00,
 			DIVUW = 0x01,
 			SRAW = 0x20
@@ -175,55 +171,41 @@ namespace Emulator {
 			CSRC = 0x03,
 			CSRWI = 0x05,
 			CSRSI = 0x06,
-			CSRCI = 0x07
-		};
-	
-		enum class EnvironmentImm : uint64_t {
+			CSRCI = 0x07,
+
 			ECALL = 0x00,
 			EBREAK = 0x01,
 			RET = 0x02,
 			WFI = 0x05,
-			OTHER
+			OTHER = 0x06,
+
+			ECALL7 = 0x00,
+			EBREAK7 = 0x00,
+			URET7 = 0x00,
+			SRET7 = 0x08,
+			MRET7 = 0x18,
+			WFI7 = 0x08,
+			SFENCEVMA7 = 0x09,
+			HFENCEBVMA7 = 0x11,
+			HFENCEGVMA7 = 0x51
 		};
 	
-		enum class Environment : uint64_t {
-			ECALL = 0x00,
-			EBREAK = 0x00,
-			URET = 0x00,
-			SRET = 0x08,
-			MRET = 0x18,
-			WFI = 0x08,
-			SFENCEVMA = 0x09,
-			HFENCEBVMA = 0x11,
-			HFENCEGVMA = 0x51
-		};
-	
-		enum class Fl : uint64_t {
+		enum class FdType : uint64_t {
 			FLW = 0x02,
-			FLD = 0x03
-		};
-	
-		enum class Fs : uint64_t {
+			FLD = 0x03,
+
 			FSW = 0x02,
-			FSD = 0x03
-		};
-	
-		enum class FmAdd : uint64_t {
+			FSD = 0x03,
+
 			FMADDS = 0x00,
-			FMADDD = 0x01
-		};
-	
-		enum class FnmAdd : uint64_t {
+			FMADDD = 0x01,
+
 			FNMADDS = 0x00,
-			FNMADDD = 0x01
-		};
-	
-		enum class FnmSub : uint64_t {
+			FNMADDD = 0x01,
+
 			FNMSUBS = 0x00,
-			FNMSUBD = 0x01
-		};
-	
-		enum class Fother : uint64_t {
+			FNMSUBD = 0x01,
+
 			FADDS = 0x00,
 			FADDD = 0x01,
 	
@@ -260,37 +242,27 @@ namespace Emulator {
 			FMVXD = 0x71,
 	
 			FMVWX = 0x78,
-			FMVDX = 0x79
-		};
-	
-		enum class Fsgnj : uint64_t {
+			FMVDX = 0x79,
+
 			FSGNJ = 0x00,
 			FSGNJN = 0x01,
-			FSGNJX = 0x02
-		};
-	
-		enum class FminMax : uint64_t {
+			FSGNJX = 0x02,
+
 			MIN = 0x00,
-			MAX = 0x01
-		};
-	
-		enum class Fc : uint64_t {
+			MAX = 0x01,
+
 			FLE = 0x00,
 			FLT = 0x01,
-			FEQ = 0x02
-		};
-	
-		enum class Fcvt : uint64_t {
+			FEQ = 0x02,
+
 			FCVT0 = 0x00,
 			FCVT1 = 0x01,
 			FCVT2 = 0x02,
-			FCVT3 = 0x03
-		};
-	
-		enum class Fmv : uint64_t {
+			FCVT3 = 0x03,
+
 			FMV = 0x00,
 			FCLASS = 0x01
-		}
+		};
 
 		enum class Q0 : uint64_t {
 			ADDI4SPN = 0x00,
