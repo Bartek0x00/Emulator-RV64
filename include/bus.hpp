@@ -1,13 +1,17 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 #include <string_view>
 #include "device.hpp"
 
 namespace Emulator {
+	template<typename T>
+	concept InheritedDevice = std::is_base_of<Device, T>::value;
+	
 	class Bus {
 	private:
-		std::vector<Device*> devices;
+		std::vector<std::unique_ptr<Device>> devices;
 
 	public:
 		explicit Bus(void) = default;
@@ -15,10 +19,15 @@ namespace Emulator {
 		Device& operator[](uint64_t addr) const;
 		Device& operator[](std::string_view name) const;
 		void dump(void) const;
-
-		inline void add(Device *device)
+		
+		template<InheritedDevice T, typename... Args>
+		inline void add(Args&&... args)
 		{
-			devices.push_back(device);
+			devices.emplace_back(
+				std::make_unique<T>(
+					std::forward<Args>(args)...
+				)
+			);
 		}
 		
 		inline uint64_t load(uint64_t addr, uint64_t len)

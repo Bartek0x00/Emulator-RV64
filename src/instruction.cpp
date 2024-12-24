@@ -1217,6 +1217,107 @@ static inline bool is_fs(void)
 	return false;
 }
 
+static inline float get_cnanf(void)
+{
+	uint32_t nan_raw = 0x7fc00000U;
+	return bit_cast<float>(nan_raw);
+}
+
+static inline double get_cnand(void)
+{
+	uint64_t nan_raw = 0x7ff8000000000000ULL;
+	return bit_cast<double>(nan_raw);
+}
+
+static inline bool is_cnanf(float valf)
+{
+	uint32_t nan_raw = 0x7fc00000U;
+	uint32_t val = bit_cast<uint32_t>(valf);
+	return nan_raw == val;
+}
+
+static inline bool is_cnand(double vald)
+{
+	uint64_t nan_raw = 0x7ff8000000000000ULL;
+	uint64_t val = bit_cast<uint64_t>(vald);
+	return nan_raw == val;
+}
+
+static inline bool is_snanf(float valf)
+{
+	uint32_t snan_raw = 0x7f800001U;
+	uint32_t val = bit_cast<uint32_t>(valf);
+	return snan_raw == val;
+}
+
+static inline bool is_snand(double vald)
+{
+	uint64_t snan_raw = 0x7ff0000000000001ULL;
+	uint64_t val = bit_cast<uint64_t>(vald);
+	return snan_raw == val;
+}
+
+template<typename T>
+static T round(T val, Decoder decoder)
+{
+	T newval = val;
+	uint64_t rm = decoder.rounding_mode();
+
+	switch (static_cast<Cpu::FPURoundingMode>(rm)) {
+	case FPURoundingMode::ROUND_TO_NEAREST:
+	case FPURoundingMode::ROUND_NEAREST_MAX_MAGNITUDE:
+		newval = std::round(val);
+		break;
+	case FPURoundingMode::ROUND_TO_ZERO:
+		newval = std::trunc(val);
+		break;
+	case FPURoundingMode::ROUND_DOWN:
+		newval = std::floor(val);
+		break;
+	case FPURoundingMode::ROUND_UP:
+		newval = std::ceil(val);
+		break;
+	case FPURoundingMode::ROUND_DYNAMIC:
+		break;
+	default:
+		cpu.set_exception(
+			Exception::ILLEGAL_INSTRUCTION
+		);
+	}
+
+	if (newval != val)
+		cpu.csr_regs.store(
+			CRegs::Address::FFLAGS,
+			cpu.csr_regs.load(
+				CRegs::Address::FFLAGS
+			) | CRegs::FExcept::INEXACT
+		);
+	
+	return newval;
+}
+
+template<typename T1, typename T2>
+static T1 try_convert(T2 val)
+{
+	constexpr T1 min = std::numeric_limits<T1>::min();
+	constexpr T1 max = std::numeric_limits<T1>::max();
+
+	bool is_nan = std::isnan(val);
+	
+	if (is_nan || val < min || val >= max)
+		cpu.csr_regs.store(
+			CRegs::Address::FFLAGS,
+			cpu.csr_regs.load(
+				CRegs::Address::FFLAGS
+			) | CRegs::FExcept::INVALID
+		);
+
+	if (is_nan)
+		val = max;
+	
+	return val;
+}
+
 static void fl(Decoder decoder)
 {
 	if (!is_fs())
@@ -1280,13 +1381,48 @@ static void fmadd(Decoder decoder)
 	if (!is_fs())
 		return;
 	
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t rs3 = decoder.rs3();
+
 	switch (static_cast<FdType>(decoder.funct2())) {
 	case FdType::FMADDS:
-		fmadds
+	{
+		float val1 = cpu.flt_regs[rs1];
+		float val2 = cpu.flt_regs[rs2];
+		float val3 = cpu.flt_regs[rs3];
+
+		float res = (val1 * val2) + val3;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+		
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	case FdType::FMADDD:
-		fmaddd
+	{
+		double val1 = cpu.flt_regs[rs1];
+		double val2 = cpu.flt_regs[rs2];
+		double val3 = cpu.flt_regs[rs3];
+
+		double res = (val1 * val2) + val3;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	default:
 		cpu.set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
@@ -1303,13 +1439,48 @@ static void fmsub(Decoder decoder)
 	if (!is_fs())
 		return;
 
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t rs3 = decoder.rs3();
+
 	switch (static_cast<FdType>(decoder.funct2())) {
 	case FdType::FMSUBS:
-		fmsubs
+	{
+		float val1 = cpu.flt_regs[rs1];
+		float val2 = cpu.flt_regs[rs2];
+		float val3 = cpu.flt_regs[rs3];
+
+		float res = (val1 * val2) - val3;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	case FdType::FMSUBD:
-		fmsubd
+	{
+		double val1 = cpu.flt_regs[rs1];
+		double val2 = cpu.flt_regs[rs2];
+		double val3 = cpu.flt_regs[rs3];
+
+		double res = (val1 * val2) - val3;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	default:
 		cpu.set_exception(
 			Exception::ILLEGAL_INSTRUCTION.
@@ -1326,13 +1497,52 @@ static void fnmadd(Decoder decoder)
 	if (!is_fs())
 		return;
 	
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t rs3 = decoder.rs3();
+
 	switch (static_cast<FdType>(decoder.funct2())) {
 	case FdType::FNMADDS:
-		fnmadds
+	{
+		float val1 = -static_cast<float>(
+			cpu.flt_regs[rs1]
+		);
+		float val2 = cpu.flt_regs[rs2];
+		float val3 = cpu.flt_regs[rs3];
+
+		float res = (val1 * val2) + val3;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	case FdType::FNMADDD:
-		fnmaddd
+	{
+		double val1 = -static_cast<double>(
+			cpu.flt_regs[rs1]
+		);
+		double val2 = cpu.flt_regs[rs2];
+		double val3	= cpu.flt_regs[rs3];
+
+		double res = (val1 * val2) + val3;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	default:
 		cpu.set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
@@ -1349,13 +1559,52 @@ static void fnmsub(Decoder decoder)
 	if (!is_fs())
 		return;
 
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+	uint64_t rs3 = decoder.rs3();
+
 	switch (static_cast<FdType>(decoder.funct2())) {
 	case FdType::FNMSUBS:
-		fnmsubs
+	{
+		float val1 = -static_cast<float>(
+			cpu.flt_regs[rs1]
+		);
+		float val2 = cpu.flt_regs[rs2];
+		float val3 = cpu.flt_regs[rs3];
+
+		float res = (val1 * val2) - val3;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	case FdType::FNMSUBD:
-		fnmsubd
+	{
+		double val1 = -static_cast<double>(
+			cpu.flt_regs[rs1]
+		);
+		double val2 = cpu.flt_regs[rs2];
+		double val3 = cpu.flt_regs[rs3];
+
+		double res = (val1 * val2) - val3;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
+	}
 	default:
 		cpu.set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
@@ -1372,42 +1621,140 @@ static void fother(Decoder decoder)
 	if (!is_fs())
 		return;
 	
+	uint64_t rd = decoder.rd();
+	uint64_t rs1 = decoder.rs1();
+	uint64_t rs2 = decoder.rs2();
+
+	float val1f = cpu.flt_regs[rs1];
+	float val2f = cpu.flt_regs[rs2];
+
+	double val1d = cpu.flt_regs[rs1];
+	double val2d = cpu.flt_regs[rs2];
+
 	switch (static_cast<FdType>(decoder.funct7()) {
 	case FdType::FADDS:
-		fadds
+		float res = val1f + val2f;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FADDD:
-		faddd
+		double res = val1d + val2d;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FSUBS:
-		fsubs
+		float res = val1f - val2f;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FSUBD:
-		fsubd
+		double res = val1d - val2d;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+		
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FMULS:
-		fmuls
+		float res = val1f * val2f;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FMULD:
-		fmuld
+		double res = val1d * val2d;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FDIVS:
-		fdivs
+		float res = val1f / val2f;
+		if (is_cnanf(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FDIVD:
-		fdivd
+		double res = val1d / val2d;
+		if (is_cnand(res))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = res;
 		break;
 	case FdType::FSNGJS:
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FSGNJ:
-			fsgnjs
+			cpu.flt_regs[rd] = static_cast<float>(
+				std::copysign(val1f, val2f)
+			);
 			break;
 		case FdType::FSGNJN:
-			fsgnjns
+			val2f = -static_cast<float>(
+				cpu.flt_regs[rs2]
+			);
+			cpu.flt_regs[rd] = static_cast<float>(
+				std::copysign(val1f, val2f)
+			);
 			break;
 		case FdType::FSGNJX:
-			fsgnjxs
+		{
+			uint32_t uval1 = cpu.flt_regs[rs1];
+			uint32_t uval2 = cpu.flt_regs[rs2];
+
+			uint32_t mask = 1ULL << 31;
+			uint32_t res = uval1 & (mask - 1);
+			res |= (uval1 & mask) ^ (uval2 & mask);
+			
+			cpu.flt_regs[rd] = reinterpret_cast<double>(res);
 			break;
+		}
 		default:
 			cpu.set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -1419,14 +1766,30 @@ static void fother(Decoder decoder)
 	case FdType::FSNGJD:
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FSGNJ:
-			fsgnjd
+			cpu.flt_regs[rd] = static_cast<double>(
+				std::copysign(val1d, val2d)
+			);
 			break;
 		case FdType::FSGNJN:
-			fsgnjnd
+			val2d = -static_cast<double>(
+				cpu.flt_regs[rs2]
+			);
+			cpu.flt_regs[rd] = static_cast<double>(
+				std::copysign(val1d, val2d)
+			);
 			break;
 		case FdType::FSGNJX:
-			fsgnjxd
+		{
+			uint64_t uval1 = cpu.flt_regs[rs1];
+			uint64_t uval2 = cpu.flt_regs[rs2];
+
+			uint64_t mask = 1ULL << 63;
+			uint64_t res = uval1 & (mask - 1);
+			res |= (uval1 & mask) ^ (uval2 & mask);
+
+			cpu.flt_regs[rd] = reinterpret_cast<double>(res);
 			break;
+		}
 		default:
 			cpu.set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -1436,12 +1799,53 @@ static void fother(Decoder decoder)
 		}
 		break;
 	case FdType::FMINMAXS:
+	{
+		bool is_val1_nan = std::isnan(val1f);
+		bool is_val2_nan = std::isnan(val2f);
+		
+		if (is_snanf(val1f) || is_snanf(val2f))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		if (is_val1_nan && is_val2_nan) {
+			cpu.flt_regs[rd] = get_cnanf();
+			break;
+		}
+
+		if (is_val1_nan) {
+			cpu.flt_regs[rd] = val2f;
+			break;
+		}
+
+		if (is_val2_nan) {
+			cpu.flt_regs[rd] = val1f;
+			break;
+		}
+
+		if (val1f == val2f) {
+			if (std::signbit(val1f)
+				cpu.flt_regs[rd] = val1f;
+			else
+				cpu.flt_regs[rd] = val2f;
+			break;
+		}
+
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::MIN:
-			fmins
+			if (val1f < val2f)
+				cpu.flt_regs[rd] = val1f;
+			else
+				cpu.flt_regs[rd] = val2f;
 			break;
 		case FdType::MAX:
-			fmaxs
+			if (val1f > val2f)
+				cpu.flt_regs[rd] = val1f;
+			else
+				cpu.flt_regs[rd] = val2f;
 			break;
 		default:
 			cpu.set_exception(
@@ -1451,13 +1855,54 @@ static void fother(Decoder decoder)
 			break;
 		}
 		break;
+	}
 	case FdType::FMINMAXD:
+		bool is_val1_nan = std::isnan(val1d);
+		bool is_val2_nan = std::isnan(val2d);
+		
+		if (is_snand(val1d) || is_snand(val2d))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		if (is_val1_nan && is_val2_nan) {
+			cpu.flt_regs[rd] = get_cnand();
+			break;
+		}
+
+		if (is_val1_nan) {
+			cpu.flt_regs[rd] = val2d;
+			break;
+		}
+
+		if (is_val2_nan) {
+			cpu.flt_regs[rd] = val1d;
+			break;
+		}
+
+		if (val1d == val2d) {
+			if (std::signbit(val1d)
+				cpu.flt_regs[rd] = val1d;
+			else
+				cpu.flt_regs[rd] = val2d;
+			break;
+		}
+		
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::MIN:
-			fmind
+			if (val1d < val2d)
+				cpu.flt_regs[rd] = val1d;
+			else 
+				cpu.flt_regs[rd] = val2d;
 			break;
 		case FdType::MAX:
-			fmaxd
+			if (val1d > val2d)
+				cpu.flt_regs[rd] = val1d;
+			else
+				cpu.flt_regs[rd] = val2d;
 			break;
 		default:
 			cpu.set_exception(
@@ -1467,27 +1912,77 @@ static void fother(Decoder decoder)
 		}
 		break;
 	case FdType::FCVTSD:
-		fcvtsd
+	{
+		float val = static_cast<double>(
+			cpu.flt_regs[rs1]
+		);
+		if (std::isnan(val))
+			val = std::numeric_limits<float>::quiet_NaN();
+		
+		cpu.flt_regs[rd] = val;
 		break;
+	}
 	case FdType::FCVTDS:
-		fcvtds
+	{
+		double val = static_cast<float>(
+			cpu.flt_regs[rs1]
+		);
+		if (std::isnan(val))
+			val = std::numeric_limits<double>::quiet_NaN();
+		
+		cpu.flt_regs[rd] = val;
 		break;
+	}
 	case FdType::FSQRTS:
-		fsqrts
+		if (val1f < static_cast<float>(0))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = static_cast<float>(
+			std::sqrt(val1f)
+		);
 		break;
 	case FdType::FSQRTD:
-		fsqrtd
+		if (val1d < static_cast<double>(0))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
+		cpu.flt_regs[rd] = static_cast<double>(
+			std::sqrt(val1d)
+		);
 		break;
 	case FdType::FCS:
+		if (std::isnan(val1f) || std::isnan(val2f))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FLE:
-			fles
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1f <= val2f
+			);
 			break;
 		case FdType::FLT:
-			flts
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1f < val2f
+			);
 			break;
 		case FdType::FEQ:
-			feqs
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1f == val2f
+			);
 			break;
 		default:
 			cpu.set_exception(
@@ -1498,15 +1993,29 @@ static void fother(Decoder decoder)
 		}
 		break;
 	case FdType::FCD:
+		if (std::isnan(val1d) || std::isnan(val2d))
+			cpu.csr_regs.store(
+				CRegs::Address::FFLAGS,
+				cpu.csr_regs.load(
+					CRegs::Address::FFLAGS
+				) | CRegs::FExcept::INVALID
+			);
+
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FLE:
-			fled
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1d <= val2d
+			);
 			break;
 		case FdType::FLT:
-			fltd
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1d < val2d
+			);
 			break;
 		case FdType::FEQ:
-			feqd
+			cpu.int_regs[rd] = static_cast<bool>(
+				val1d == val2d
+			);
 			break;
 		default:
 			cpu.set_exception(
@@ -1517,24 +2026,189 @@ static void fother(Decoder decoder)
 		}
 		break;
 	case FdType::FCVTS:
-		fcvtss
+	{
+		float val = round(
+			static_cast<float>(cpu.flt_regs[rs1]),
+			decoder
+		);
+
+		switch (static_cast<FdType>(rs2)) {
+		case FdType::FCVT0:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				try_convert<int32_t>(val)
+			);
+			break;
+		case FdType::FCVT1:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				try_convert<uint32_t>(val)
+			);
+			break;
+		case FdType::FCVT2:
+			cpu.int_regs[rd] = try_convert<int64_t>(val);
+			break;
+		case FdType::FCVT3:
+			cpu.int_regs[rd] = try_convert<uint64_t>(val);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
 		break;
+	}
 	case FdType::FCVTD:
-		fcvtsd
+	{
+		double val = round(
+			static_cast<double>(cpu.flt_regs[rs1]),
+			decoder
+		);
+
+		switch (static_cast<FdType>(rs2)) {
+		case FdType::FCVT0:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				try_convert<int32_t>(val)
+			);
+			break;
+		case FdType::FCVT1:
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				try_convert<uint32_t>(val)
+			);
+			break;
+		case FdType::FCVT2:
+			cpu.int_regs[rd] = try_convert<int64_t>(val);
+			break;
+		case FdType::FCVT3:
+			cpu.int_regs[rd] = try_convert<uint64_t>(val);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
 		break;
+	}
 	case FdType::FCVTSW:
-		fcvtsw
+	{
+		int64_t val = cpu.int_regs[rs1];
+			
+		switch (static_cast<FdType>(rs2)) {
+		case FdType::FCVT0:
+			cpu.flt_regs[rd] = static_cast<float>(
+				static_cast<int32_t>(val)
+			);
+			break;
+		case FdType::FCVT1:
+			cpu.flt_regs[rd] = static_cast<float>(
+				static_cast<uint32_t>(val)
+			);
+			break;
+		case FdType::FCVT2:
+			cpu.flt_regs[rd] = static_cast<float>(
+				val
+			);
+			break;
+		case FdType::FCVT3:
+			cpu.flt_regs[rd] = static_cast<float>(
+				static_cast<uint64_t>(val)
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
 		break;
+	}
 	case FdType::FCVTDW:
-		fcvtdw
+	{
+		int64_t val = cpu.int_regs[rs1];
+
+		switch (static_cast<FdType>(rs2)) {
+		case FdType::FCVT0:
+			cpu.flt_regs[rd] = static_cast<double>(
+				static_cast<int32_t>(val)
+			);
+			break;
+		case FdType::FCVT1:
+			cpu.flt_regs[rd] = static_cast<double>(
+				static_cast<uint32_t>(val)
+			);
+			break;
+		case FdType::FCVT2:
+			cpu.flt_regs[rd] = static_cast<double>(
+				val
+			);
+			break;
+		case FdType::FCVT3:
+			cpu.flt_regs[rd] = static_cast<double>(
+				static_cast<uint64_t>(val)
+			);
+			break;
+		default:
+			cpu.set_exception(
+				Exception::ILLEGAL_INSTRUCTION,
+				decoder.insn
+			);
+			break;
+		}
 		break;
+	}
 	case FdType::FMVXW:
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FMV:
-			fmvs
+		{
+			uint32_t val = reinterpret_cast<uint32_t>(
+				static_cast<float>(
+					cpu.flt_regs[rs1]
+				)
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val
+			);
 			break;
+		}
 		case FdType::FCLASS:
-			fclasss
+			float val = cpu.flt_regs[rs1];
+			bool is_neg = std::signbit(val);
+
+			switch (std::fpclassify(val)) {
+			case FP_INFINITE:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::INF;
+				else
+					cpu.int_regs[rd] = FValue::POS_INF;
+				break;
+			case FP_NORMAL:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::NORMAL;
+				else
+					cpu.int_regs[rd] = FValue::POS_NORMAL;
+				break;
+			case FP_SUBNORMAL:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::SUBNORMAL;
+				else
+					cpu.int_regs[rd] = FValue::POS_SUBNORMAL;
+				break;
+			case FP_ZERO:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::NEG_ZERO;
+				else
+					cpu.int_regs[rd] = FValue::POS_ZERO;
+				break;
+			case FP_NAN:
+				if (is_snanf(val))
+					cpu.int_regs[rd] = FValue::NAN_SIG;
+				else
+					cpu.int_regs[rd] = FValue::NAN_QUIET;
+				break;
+			}
 			break;
 		default:
 			cpu.set_exception(
@@ -1547,10 +2221,51 @@ static void fother(Decoder decoder)
 	case FdType::FMVXD:
 		switch (static_cast<FdType>(decoder.funct3())) {
 		case FdType::FMV:
-			fmvd
+			uint64_t val = reinterpret_cast<uint64_t>(
+				static_cast<double>(
+					cpu.flt_regs[rs1]
+				)
+			);
+			cpu.int_regs[rd] = static_cast<int64_t>(
+				val
+			);
 			break;
 		case FdType::FCLASS:
-			fclassd
+			double val = cpu.flt_regs[rs1];
+			bool is_neg = std::signbit(val);
+
+			switch (std::fpclassify(val)) {
+			case FP_INFINITE:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::INF;
+				else
+					cpu.int_regs[rd] = FValue::POS_INF;
+				break;
+			case FP_NORMAL:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::NORMAL;
+				else
+					cpu.int_regs[rd] = FValue::POS_NORMAL;
+				break;
+			case FP_SUBNORMAL:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::SUBNORMAL;
+				else
+					cpu.int_regs[rd] = FValue::POS_SUBNORMAL;
+				break;
+			case FP_ZERO:
+				if (is_neg)
+					cpu.int_regs[rd] = FValue::NEG_ZERO;
+				else
+					cpu.int_regs[rd] = FValue::POS_ZERO;
+				break;
+			case FP_NAN:
+				if (is_snand(val))
+					cpu.int_regs[rd] = FValue::NAN_SIG;
+				else
+					cpu.int_regs[rd] = FValue::NAN_QUIET;
+				break;
+			}
 			break;
 		default:
 			cpu.set_exception(
@@ -1561,10 +2276,18 @@ static void fother(Decoder decoder)
 		}
 		break;
 	case FdType::FMVWX:
-		fmvsx
+		cpu.flt_regs[rd] = reinterpret_cast<double>(
+			static_cast<uint64_t>(
+				static_cast<uint32_t>(
+					cpu.int_regs[rs1]
+				)
+			)
+		);
 		break;
 	case FdType::FMVDX:
-		fmvdx
+		cpu.flt_regs[rd] = reinterpret_cast<double>(
+			cpu.int_regs[rs1]
+		);
 		break;
 	default:
 		cpu.set_exception(

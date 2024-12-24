@@ -1,15 +1,16 @@
 #pragma once
 
 #include <string_view>
+#include <set>
 #include "registers.hpp"
 #include "interrupt.hpp"
 #include "exception.hpp"
 #include "bus.hpp"
 
 namespace Emulator {
-    class Cpu {
-    private:
-        enum class Mode : uint64_t {
+	class Cpu {
+    public:
+		enum class Mode : uint64_t {
 			USER = 0x00,
 			SUPERVISOR = 0x01,
 			MACHINE = 0x03,
@@ -31,7 +32,6 @@ namespace Emulator {
 				   ROUND_DYNAMIC
 		};
 
-	public:
 		Interrupt interrupt;
         Exception exception;
 
@@ -41,7 +41,25 @@ namespace Emulator {
         uint64_t pc;
 		
 		std::set<uint64_t> reservations;
-        
-		explicit Cpu(void);
-    };
+        bool sleep = false;
+		
+		inline void set_exception(Exception::ExceptionValue type, uint64_t data = 0)
+		{
+			exception.current = type;
+			exception.value = data;
+		}
+
+		inline void clear_exception(void)
+		{
+			exception.current = Exception::NONE;
+			exception.value = 0;
+		}
+				
+		explicit constexpr inline Cpu(void);
+		void run(void);
+    	uint32_t cycle(void);
+		void dump_regs(void);
+	};
+
+	extern Cpu cpu;
 };

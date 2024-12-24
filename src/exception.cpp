@@ -2,9 +2,9 @@
 
 using namespace Emulator;
 
-std::string_view Exception::get_name(ExceptionValue exc_val)
+std::string_view Exception::get_name(current)
 {
-    switch (exc_val) {
+    switch (current) {
     case INSTRUCTION_ADDRESS_MISALIGNED:	return "InstructionAddressMisaligned";
     case INSTRUCTION_ACCESS_FAULT: 			return "InstructionAccessFault";
     case ILLEGAL_INSTRUCTION: 				return "IllegalInstruction";
@@ -30,7 +30,7 @@ void Exception::process(void)
     Cpu::Mode mode = cpu.mode;
 
     bool medeleg_flag = 
-        (cpu.csr_regs.load(CRegs::Address::MEDELEG) >> cpu.exc_val) & 1;
+        (cpu.csr_regs.load(CRegs::Address::MEDELEG) >> current) & 1;
 
     if (medeleg_flag && 
         (mode == Cpu::Mode::USER || mode == Cpu::Mode::SUPERVISOR)
@@ -40,8 +40,8 @@ void Exception::process(void)
         cpu.pc = stvec_val & ~3ULL;
 
         cpu.csr_regs.store(CRegs::Address::SEPC, (pc & ~1ULL));
-        cpu.csr_regs.store(CRegs::Address::SCAUSE, cpu.exc_val);
-        cpu.csr_regs.store(Cregs::Address::STVAL, cpu.exc_data);
+        cpu.csr_regs.store(CRegs::Address::SCAUSE, current);
+        cpu.csr_regs.store(Cregs::Address::STVAL, value);
 
         uint64_t sie = read_bit(
             cpu.csr_regs.load(CRegs::Address::SSTATUS), 
@@ -77,8 +77,8 @@ void Exception::process(void)
         cpu.pc = mtvec_val & ~3ULL;
 
         cpu.csr_regs.store(CRegs::Address::MEPC, (pc & ~1ULL));
-        cpu.csr_regs.store(CRegs::Address::MCAUSE, cpu.exc_val);
-        cpu.csr_regs.store(CRegs::Address::MTVAL, cpu.exc_data);
+        cpu.csr_regs.store(CRegs::Address::MCAUSE, current);
+        cpu.csr_regs.store(CRegs::Address::MTVAL, value);
         
         uint64_t mie = read_bit(
             cpu.csr_regs.load(CRegs::Address::MSTATUS),

@@ -27,10 +27,8 @@ namespace Emulator {
 		constexpr uint64_t TRESHOLD_CLAIM_SIZE = 0x1007;
 	
 	public:
-		explicit inline Plic(void) : \
-			base(0xC000000), 
-			size(0x208000),
-			name("PLIC") {};
+		explicit inline Plic(void) : 
+			Device(0xC000000ULL, 0x208000ULL, "PLIC") {};
 
 		inline bool is_enabled(uint64_t ctx, uint64_t irq)
 		{

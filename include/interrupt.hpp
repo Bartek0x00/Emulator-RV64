@@ -17,11 +17,14 @@ namespace Emulator {
             SUPERVISOR_EXTERNAL = 9,
             MACHINE_EXTERNAL = 11,
         };
+		
+		InterruptValue current;
 
-        std::string_view get_name(InterruptValue int_value);
-        InterruptValue get_pending(void);
-        void process(InterruptValue int_value);
+        std::string_view get_name(void);
+        void get_pending(void);
+        void process(void);
 
-        explicit inline Interrupt(void) = default;
+        explicit constexpr inline Interrupt(void) : 
+			current(NONE) {};
     };
 };

@@ -1,18 +1,39 @@
 #pragma once
 
 #include <cstdint>
+#include <chrono>
 
 namespace Emulator {
+	enum MemSize {
+		KIB,
+		MIB,
+		GIB
+	};
+
+	template<MemSize S>
+	constexpr inline uint64_t size(uint64_t num)
+	{
+		switch (S) {
+		case KIB:
+			return 1024	* num;
+		case MIB:
+			return 1024 * 1024 * num;
+		case GIB:
+			return 1024 * 1024 * 1024 * num;
+		}
+	}
+
 	inline uint64_t get_milliseconds(void)
 	{
-		using clock = std::chrono::high_resolution_clock;
-		using cast = std::chrono::duration_cast
-		using msec = std::chrono::miliseconds;
+		using namespace std::chrono;
+		using clock = high_resolution_clock;
+		
+		static const time_point<clock> start_time = clock::now();
+		time_point<clock> now = clock::now();
 
-		static const auto start_time = clock::now();
-		auto now = clock::now();
-
-		return cast<msec>(now - start_time).count();
+		return duration_cast<milliseconds>(
+			now - start_time
+		).count();
 	}
 	
 	inline uint64_t read_bit(uint64_t value, uint64_t off)

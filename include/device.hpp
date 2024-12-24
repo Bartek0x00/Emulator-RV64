@@ -14,6 +14,9 @@ namespace Emulator {
 		virtual void store(uint64_t addr, uint64_t value, uint64_t len) = 0;
 		virtual void dump(void) const = 0;
 		virtual void tick(void);
+		
+		inline Device(uint64_t _base, uint64_t _size, const std::string_view& _name) :
+			base(_base), size(_size), name(_name) {};
 
 		virtual ~Device() = default;
 	};

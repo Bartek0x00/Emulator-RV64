@@ -23,9 +23,13 @@ namespace Emulator {
             STORE_PAGE_FAULT = 15,
         };
 
-        std::string_view get_name(ExceptionValue exc_value);
+		ExceptionValue current;
+		uint64_t value;
+
+        std::string_view get_name(void);
         void process(void);
 
-        explicit inline Exception(void) = default;
+        explicit constexpr inline Exception(void) :
+			current(NONE), value(0) {};
     };
 };

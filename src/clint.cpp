@@ -1,3 +1,7 @@
+#include "common.hpp"
+#include "errors.hpp"
+#include "registers.hpp"
+#include "emulator.hpp"
 #include "clint.hpp"
 
 using namespace Emulator;

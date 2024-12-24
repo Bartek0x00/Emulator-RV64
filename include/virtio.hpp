@@ -101,10 +101,8 @@ namespace Emulator {
 
 	public:
 		explicit Virtio(std::vector<uint8_t> data) :
-			rfsimg(std::move(data)),
-			base(VIRTIO_BASE), 
-			size(VIRTIO_SIZE), 
-			name("VIRTIO") {};
+			Device(VIRTIO_BASE, VIRTIO_SIZE, "VIRTIO"),
+			rfsimg(std::move(data)) {};
 
 		uint64_t load(uint64_t addr, uint64_t len) override;
 		void store(uint64_t addr, uint64_t value, uint64_t len) override;

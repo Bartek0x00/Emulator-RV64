@@ -10,9 +10,11 @@ namespace Emulator {
 	
 	public:
 		explicit Syscon(void) : 
-			base(POWEROFF_BASE), 
-			size(REBOOT_BASE - POWEROFF_BASE), 
-			name("SYSCON") {};
+			Device(
+				POWEROFF_BASE, 
+				REBOOT_BASE - POWEROFF_BASE, 
+				"SYSCON"
+			) {};
 
 		uint64_t load(uint64_t addr, uint64_t len) override;
 		void store(uint64_t addr, uint64_t value, uint64_t len) override;

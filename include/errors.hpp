@@ -1,48 +1,32 @@
 #pragma once
 
 #include <exception>
+#include <iostream>
+#include <utility>
 
 namespace Emulator {
-	enum class Error : uint64_t {
+	enum Error : uint64_t {
         INFO = 0,
-        WARN,
-        FAIL,
-		EXIT
+        WARN = 1,
+        FAIL = 2,
     };
 	
-	constexpr const char *COLOR_NONE = "\033[0m";
-	constexpr const char *COLOR_WARN = "\033[1;38;5;1m";
-	constexpr const char *COLOR_FAIL = "\033[1;38;5;3m";
+	constexpr const char *color[3] = {
+		"\033[0m",
+		"\033[1;38;5;1m",
+		"\033[1;38;5;3m"
+	};
 
 	template<Error E, typename... Args>
-	constexpr inline void error(Args&&... args);
-
-	template<typename... Args>
-	constexpr inline void error<INFO>(Args&&... args)
+	inline void error(Args&&... args)
 	{
-		(std::cerr << std::hex << ... << std::forward<Args>(args)) << '\n';
+		using namespace std;
+
+		cerr << color[E] << hex;
+		(cerr << ... << forward<Args>(args));
+		cerr << color[0] << '\n';
+
+		if constexpr (E == FAIL)
+			throw runtime_error("FATAL");
 	}
-
-	template<typename... Args>
-	constexpr inline void error<WARN>(Args&&... args)
-	{
-		std::cerr << COLOR_WARN;
-
-		(std::cerr << std::hex << ... << std::forward<Args>(args)) << '\n';
-
-		std::cerr << COLOR_NONE;
-	}
-
-	[[noreturn]]
-	template<typename... Args>
-	constexpr inline void error<FAIL>(Args&&... args)
-	{
-		std::cerr << COLOR_FAIL;
-
-		(std::cerr << std::hex << ... << std::forward<Args>(args)) << std::endl;
-
-		std::cerr << COLOR_NONE;
-
-		throw std::exception();
-	}
-};
+}

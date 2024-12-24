@@ -1,5 +1,6 @@
 #include "errors.hpp"
 #include "gpu.hpp"
+#include "font.hpp"
 
 using namespace Emulator;
 

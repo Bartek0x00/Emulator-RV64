@@ -3,6 +3,8 @@
 
 using namespace Emulator;
 
+Mmu mmu;
+
 uint64_t Mmu::load(uint64_t addr, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::LOAD);

@@ -2,9 +2,9 @@
 
 using namespace Emulator;
 
-std::string_view Interrupt::get_name(InterruptValue int_value)
+std::string_view Interrupt::get_name(void)
 {
-    switch (value) {
+    switch (current) {
     case USER_SOFTWARE: 		return "UserSoftware";
     case SUPERVISOR_SOFTWARE:	return "SupervisorSoftware";
     case MACHINE_SOFTWARE: 		return "MachineSoftware";
@@ -18,7 +18,7 @@ std::string_view Interrupt::get_name(InterruptValue int_value)
     }
 }
 
-InterruptValue Interrupt::get_pending(void)
+void Interrupt::get_pending(void)
 {
     switch (cpu.mode) {
     case Cpu::Mode::MACHINE:
@@ -28,8 +28,10 @@ InterruptValue Interrupt::get_pending(void)
             CRegs::Mask::MIE
         );
 
-        if (!mie && !cpu.sleep)
-            return Interrupt::NONE;
+        if (!mie && !cpu.sleep) {
+            current = Interrupt::NONE;
+			return;
+		}
         break;
     }
 
@@ -40,9 +42,11 @@ InterruptValue Interrupt::get_pending(void)
             CRegs::Mask::SIE
         );
 
-        if (!sie && !cpu.sleep)
-            return Interrupt::NONE;
-        break;
+        if (!sie && !cpu.sleep) {
+            current = Interrupt::NONE;
+        	return;
+		}
+		break;
     }
 
     default: break;
@@ -69,8 +73,10 @@ InterruptValue Interrupt::get_pending(void)
     uint64_t mip = cpu.csr_regs.load(CRegs::Address::MIP);
     uint64_t pending = mie & mip;
 
-    if (pending == 0)
-        return NONE;
+    if (pending == 0) {
+        current = Interrupt::NONE;
+		return;
+	}
     
     if (pending & CRegs::Mask::MEIP) {
         cpu.csr_regs.store(
@@ -81,7 +87,8 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )
         );
-        return MACHINE_EXTERNAL;
+        current = Interrupt::MACHINE_EXTERNAL;
+		return;
     }
 
     if (pending & CRegs::Mask::MSIP) {
@@ -93,8 +100,9 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )    
         );
-        return MACHINE_SOFTWARE;
-    }
+        current = Interrupt::MACHINE_SOFTWARE;
+    	return;
+	}
     
     if (pending & CRegs::Mask::MTIP) {
         cpu.csr_regs.store(
@@ -105,7 +113,8 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )
         );
-        return MACHINE_TIMER;
+        current = Interrupt::MACHINE_TIMER;
+		return;
     }
     
     if (pending & CRegs::Mask::SEIP) {
@@ -117,7 +126,8 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )   
         );
-        return SUPERVISOR_EXTERNAL;
+        current = Interrupt::SUPERVISOR_EXTERNAL;
+		return;
     }
     
     if (pending & CRegs::Mask::SSIP) {
@@ -129,7 +139,8 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )
         );
-        return SUPERVISOR_SOFTWARE;
+        current = Interrupt::SUPERVISOR_SOFTWARE;
+		return;
     }
     
     if (pending & CRegs::Mask::STIP) {
@@ -141,22 +152,23 @@ InterruptValue Interrupt::get_pending(void)
                 0
             )
         );
-        return SUPERVISOR_TIMER;
+        current = Interrupt::SUPERVISOR_TIMER;
+		return;
     }
 
-    return NONE;
+    current = Interrupt::NONE;
 }
 
-void Interrupt::process(InterruptValue int_value)
+void Interrupt::process(void)
 {
     cpu.sleep = false;
     uint64_t pc = cpu.pc;
     Cpu::Mode mode = cpu.mode;
 
     bool mideleg_flag = 
-        (cpu.csr_regs.load(CRegs::Address::MIDELEG) >> int_val) & 1;
+        (cpu.csr_regs.load(CRegs::Address::MIDELEG) >> current) & 1;
 
-    if (int_val == MACHINE_TIMER)
+    if (current == MACHINE_TIMER)
         mideleg_flag = false;
 
     if (mideleg_flag && 
@@ -168,11 +180,11 @@ void Interrupt::process(InterruptValue int_value)
         uint64_t vt_off = 0;
 
         if (stvec_val & 1)
-            vt_off = int_val * 4;
+            vt_off = current * 4;
 
         cpu.pc = (stvec_val & ~3ULL) + vt_off;
         cpu.csr_regs.store(CRegs::Address::SEPC, (pc & ~1ULL));
-        cpu.csr_regs.store(CRegs::Address::SCAUSE, (1ULL << 63ULL) | int_val);
+        cpu.csr_regs.store(CRegs::Address::SCAUSE, (1ULL << 63ULL) | current);
         cpu.csr_regs.store(CRegs::Address::STVAL, 0);
 
         uint64_t sie = read_bit(
@@ -210,11 +222,11 @@ void Interrupt::process(InterruptValue int_value)
         uint64_t vt_off = 0;
 
         if (mtvec_val & 1)
-            vt_off = int_val * 4;
+            vt_off = current * 4;
 
         cpu.pc = (mtvec_val & ~3ULL) + vt_off;
         cpu.csr_regs.store(CRegs::Address::MEPC, (pc & ~1ULL));
-        cpu.csr_regs.store(CRegs::Address::MCAUSE, (1ULL << 63ULL) | int_val);
+        cpu.csr_regs.store(CRegs::Address::MCAUSE, (1ULL << 63ULL) | current);
         cpu.csr_regs.store(CRegs::Address::MTVAL, 0);
 
         uint64_t mie = read_bit(

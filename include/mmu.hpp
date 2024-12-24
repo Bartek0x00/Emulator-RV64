@@ -1,6 +1,7 @@
 #pragma once
 
 #include "bus.hpp"
+#include "cpu.hpp"
 #include <array>
 #include <cstdint>
 
@@ -41,14 +42,14 @@ namespace Emulator {
 			INSTRUCTION
 		};
 		
-		constexpr uint64_t page_size = 4096;
+		static constexpr uint64_t PAGE_SIZE = 4096;
 		
 		ModeValue mode;
 		std::array<TLBEntry, 4> tlb_cache;
 		uint32_t mppn;
 
 	public:
-        explicit inline Mmu(void) : mode(Mode::BARE), tlb_cache{}
+        explicit inline Mmu(void) : mode(ModeValue::BARE), tlb_cache{}
 		{
 			flush_tlb();
 		}
@@ -56,9 +57,9 @@ namespace Emulator {
 		inline uint32_t get_levels(void)
 		{
 			switch (mode) {
-			case Mode::SV39: return 3;
-			case Mode::SV48: return 4;
-			case Mode::SV57: return 5;
+			case ModeValue::SV39: return 3;
+			case ModeValue::SV48: return 4;
+			case ModeValue::SV57: return 5;
 			default: return 0;
 			}
 		}
@@ -89,13 +90,13 @@ namespace Emulator {
 				ppn[i] = (pte >> (10ULL + i * 9ULL)) & 0x1ffULL;
 
 			switch (mode) {
-			case Mode::SV39:
+			case ModeValue::SV39:
 				ppn[2] = (pte >> 28) & 0x03ffffffULL;
 				break;
-			case Mode::SV48:
+			case ModeValue::SV48:
 				ppn[3] = (pte >> 37) & 0x1ffffULL;
 				break;
-			case Mode::SV57:
+			case ModeValue::SV57:
 				ppn[4] = (pte >> 48) & 0xffULL;
 				break;
 			default: break;

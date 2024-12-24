@@ -81,9 +81,10 @@ namespace Emulator {
 		constexpr uint64_t UART_IRQN = 10;
 		bool is_uart_interrupting = false;
 		
-		explicit Gpu(uint32_t _width, uint32_t _height) :
+		explicit Gpu(uint32_t width, uint32_t height) :
+			Device(FB_RENDER, UART_SIZE, "GPU"),
 			width(_width), height(_height), 
-			channels(3), name("GPU") {};
+			channels(3) {};
 
 		inline uint32_t *interrupting(void)
 		{
