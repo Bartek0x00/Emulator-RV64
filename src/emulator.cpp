@@ -1,6 +1,19 @@
 #include <filesystem>
+#include <fstream>
+#include <cstring>
+#include <string>
 #include <getopt.h>
+#include "common.hpp"
 #include "emulator.hpp"
+#include "cpu.hpp"
+#include "plic.hpp"
+#include "clint.hpp"
+#include "dram.hpp"
+#include "device.hpp"
+#include "bus.hpp"
+#include "gpu.hpp"
+#include "syscon.hpp"
+#include "virtio.hpp"
 #include "settings.hpp"
 
 using namespace Emulator;
@@ -13,9 +26,10 @@ static bool patch_dtb_ram_size(
 		0x0b, 0xad, 0xc0, 0xde
 	};
 
-	std::vector<uint8_t>::iterator it = std::search(
+	auto it = std::search(
 		dtb_data.begin(), dtb_data.end(),
-		pattern.begin(), pattern.end()
+		pattern.begin(), pattern.end(),
+		[](uint8_t a, uint8_t b) {return a == b;}
 	);
 
 	if (it == dtb_data.end())
@@ -33,12 +47,12 @@ static bool patch_dtb_ram_size(
 	return true;
 }
 
-Emulator::Emulator(int argc, char *argv[])
+Emulator::Emulator::Emulator(int argc, char *argv[])
 {
-	string_view bios_p = "";
-	string_view dtb_p = "";
-	string_view kernel_p = "";
-	string_view virt_drive_p = "";
+	std::string bios_p = "";
+	std::string dtb_p = "";
+	std::string kernel_p = "";
+	std::string virt_drive_p = "";
 
 	uint64_t ram_size = RAM_SIZE;
 
@@ -68,11 +82,12 @@ Emulator::Emulator(int argc, char *argv[])
 			kernel_p = optarg;
 			break;
 		case 'r':
-			ram_size = size<MIB>(atoi(optarg));
+			ram_size = BYTE_SIZE<MIB>(atoi(optarg));
 			break;
 		case 'v':
 			virt_drive_p = optarg;
 			break;
+		case 'h':
 		default:
 			error<FAIL>(
 				"Usage: ", argv[0], " [options]\n"
@@ -85,73 +100,86 @@ Emulator::Emulator(int argc, char *argv[])
 			);
 			break;
 		}
+	}
 		
-		if (!bios_p)
-			error<FAIL>("bios path must be provided!\n");
+	if (!bios_p.size())
+		error<FAIL>("bios path must be provided!\n");
 		
-		if (kernel_p && !dtb_p)
-			error<FAIL>("dtb path must be provided when kernel is used!\n");
+	if (kernel_p.size() && !dtb_p.size())
+		error<FAIL>("dtb path must be provided when kernel is used!\n");
 
-		if (!std::filesystem::exists(bios_p))
-			error<FAIL>("bios path invalid\n");
+	if (!std::filesystem::exists(bios_p))
+		error<FAIL>("bios path invalid\n");
 
-		uint64_t ram_size_dtb = ram_size;
+	uint64_t ram_size_dtb = ram_size;
 
-		if (dtb_p)
-			ram_size_dtb += size<MIB>(2);
+	if (dtb_p.size())
+		ram_size_dtb += BYTE_SIZE<MIB>(2);
 		
-		cpu.mode = Cpu::Mode::MACHINE;
-		cpu.pc = DRAM_BASE;
-		cpu.int_regs[IRegs::sp] = DRAM_BASE + ram_size_dtb;
+	cpu = std::make_unique<Cpu>();
+	mmu = std::make_unique<Mmu>();
+	bus = std::make_unique<Bus>();
+
+	cpu->int_regs[IRegs::sp] = DRAM_BASE + ram_size_dtb;
 		
-		bus.add<Dram>(
-			DRAM_BASE,
-			ram_size_dtb,
-			std::move(load_file(bios_p))
+	bus->add<Dram, DeviceName::DRAM>(
+		DRAM_BASE,
+		ram_size_dtb,
+		std::move(load_file(bios_p))
+	);
+
+	bus->add<Plic, DeviceName::PLIC>();
+	bus->add<Clint, DeviceName::CLINT>();
+	bus->add<Gpu, DeviceName::GPU>(960, 540);
+	
+	if (virt_drive_p.size()) {
+		if (!std::filesystem::exists(virt_drive_p))
+			error<FAIL>("virt_drive path invalid\n");
+
+		bus->add<Virtio, DeviceName::VIRTIO>(
+			std::move(load_file(virt_drive_p))
 		);
+	}
 
-		bus.add<Plic>();
-		bus.add<Clint>();
-		bus.add<Gpu>(960, 540);
-		
-		if (virt_drive_p) {
-			if (!std::filesystem::exists(virt_drive_p))
-				error<FAIL>("virt_drive path invalid\n");
+	bus->add<Syscon, DeviceName::SYSCON>();
 
-			bus.add<Virtio>(
-				std::move(load_file(virt_drive_p))
+	if (dtb_p.size()) {
+		if (!std::filesystem::exists(dtb_p))
+			error<FAIL>("dtb path invalid\n");
+
+		std::vector<uint8_t> dtb = load_file(dtb_p);
+		cpu->int_regs[IRegs::a1] = DRAM_BASE + ram_size;
+	
+		if (!patch_dtb_ram_size(dtb, ram_size))
+			error<WARN>(
+				"could not find device tree binary\n"
+				"memory size magic value (0x0badc0de),\n"
+				"make sure that the amount of memory\n"
+				"that the emulator allocates is equal\n"
+				"or greater than specified in the dtb\n"
 			);
-		}
-
-		bus.add<Syscon>();
-
-		if (dtb_p) {
-			if (!std::filesystem::exists(dtb_p))
-				error<FAIL>("dtb path invalid\n");
-
-			std::vector<uint8_t> dtb = load_file(dtb_p);
-			cpu.int_regs[IRegs::a1] = DRAM_BASE + ram_size;
 		
-			if (!patch_dtb_ram_size(dtb, ram_size))
-				error<WARN>(
-					"could not find device tree binary\n"
-					"memory size magic value (0x0badc0de),\n"
-					"make sure that the amount of memory\n"
-					"that the emulator allocates is equal\n"
-					"or greater than specified in the dtb\n"
-				);
+		Dram *dram = static_cast<Dram*>(
+			bus->get(DeviceName::DRAM)
+		);
+		if (dram)
+			dram->copy(dtb, ram_size);
+	}
 
-			bus["DRAM"].copy(dtb, ram_size);
-		}
+	if (kernel_p.size()) {
+		if (!std::filesystem::exists(kernel_p))
+			error<FAIL>("kernel path invalid\n");
 
-		if (kernel_p) {
-			if (!std::filesystem::exists(kernel_p)
-				error<FAIL>("kernel path invalid\n);
-
-			std::vector<uint8_t> kernel = load_file(kernel_p);
-			bus["DRAM"].copy(kernel, KERNEL_OFFSET);
-		}
-
-		cpu.run();
+		std::vector<uint8_t> kernel = load_file(kernel_p);
+		
+		Dram *dram = static_cast<Dram*>(
+			bus->get(DeviceName::DRAM)
+		);
+		if (dram)
+			dram->copy(kernel, KERNEL_OFFSET);
+	}
+	
+	while (true) {
+		cpu->iterate();
 	}
 }

@@ -1,4 +1,5 @@
 #include <exception>
+#include "errors.hpp"
 #include "syscon.hpp"
 
 using namespace Emulator;

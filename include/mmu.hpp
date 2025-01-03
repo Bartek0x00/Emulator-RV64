@@ -3,11 +3,12 @@
 #include "bus.hpp"
 #include "cpu.hpp"
 #include <array>
+#include <memory>
 #include <cstdint>
 
 namespace Emulator {
 	class Mmu {
-    private:
+    private:		
 		struct TLBEntry {
 			uint64_t virt_base;
 			uint64_t phys_base;
@@ -21,30 +22,36 @@ namespace Emulator {
 			bool is_execute;
 			bool is_user;
 		};
-		
-		enum class ModeValue : uint64_t {
-			BARE = 0x00,
-			SV39 = 0x08,
-			SV48 = 0x09,
-			SV57 = 0x0a
+	
+		struct ModeValue {
+			enum : uint64_t {
+				BARE = 0x00,
+				SV39 = 0x08,
+				SV48 = 0x09,
+				SV57 = 0x0a
+			};
 		};
 		
-		enum class PteValue : uint64_t {
-			VALID = 0, READ,
-			WRITE, EXECUTE,
-			USER, GLOBAL,
-			ACCESSED, DIRTY
+		struct PteValue {
+			enum : uint64_t {
+				VALID = 0, READ,
+				WRITE, EXECUTE,
+				USER, GLOBAL,
+				ACCESSED, DIRTY
+			};
 		};
-
-		enum class AccessType : uint64_t {
-			LOAD = 0,
-			STORE,
-			INSTRUCTION
+		
+		struct AccessType {
+			enum : uint64_t {
+				LOAD = 0,
+				STORE,
+				INSTRUCTION
+			};
 		};
 		
 		static constexpr uint64_t PAGE_SIZE = 4096;
 		
-		ModeValue mode;
+		uint64_t mode;
 		std::array<TLBEntry, 4> tlb_cache;
 		uint32_t mppn;
 
@@ -66,10 +73,13 @@ namespace Emulator {
 
 		inline void flush_tlb(void)
 		{
+			static constexpr uint32_t reset_age = 
+				std::numeric_limits<uint32_t>::max();
+			
 			tlb_cache = {};
 
 			for (TLBEntry& entry : tlb_cache)
-				entry.age = (~0U);
+				entry.age = reset_age;
 		}
 		
 		inline std::array<uint64_t, 5> get_vpn(uint64_t addr)
@@ -105,31 +115,33 @@ namespace Emulator {
 			return ppn;
 		}
 
-		inline void set_cpu_error(uint64_t addr, AccessType access_type)
+		inline void set_cpu_error(uint64_t addr, uint64_t access_type)
 		{
 			switch (access_type) {
 			case AccessType::LOAD:
-				cpu.set_exception(Exception::LOAD_PAGE_FAULT, addr);
+				cpu->set_exception(Exception::LOAD_PAGE_FAULT, addr);
 				break;
 			case AccessType::STORE:
-				cpu.set_exception(Exception::STORE_PAGE_FAULT, addr);
+				cpu->set_exception(Exception::STORE_PAGE_FAULT, addr);
 				break;
 			case AccessType::INSTRUCTION:
-				cpu.set_exception(Exception::INSTRUCTION_PAGE_FAULT, addr);
+				cpu->set_exception(Exception::INSTRUCTION_PAGE_FAULT, addr);
 				break;
 			}
 
 			flush_tlb();
 		}
 
-		uint64_t translate(uint64_t addr, AccessType access_type);
-		bool fetch_pte(uint64_t addr, AccessType access_type, 
-			Cpu::Mode cpu_mode, TLBEntry& entry);
-		TLBEntry *get_tlb_entry(uint64_t addr, AccessType access_type,
-			Cpu::Mode cpu_mode);
+		uint64_t translate(uint64_t addr, uint64_t access_type);
+		bool fetch_pte(uint64_t addr, uint64_t access_type, 
+			uint64_t cpu_mode, TLBEntry& entry);
+		TLBEntry *get_tlb_entry(uint64_t addr, uint64_t access_type,
+			uint64_t cpu_mode);
 		uint64_t load(uint64_t addr, uint64_t len);
 		void store(uint64_t addr, uint64_t value, uint64_t len);
-		uint64_t fetch(uint64_t addr, uint64_t len);
+		uint64_t fetch(uint64_t addr, uint64_t len = 64);
 		void update(void);
 	};
+
+	extern std::unique_ptr<Mmu> mmu;
 };

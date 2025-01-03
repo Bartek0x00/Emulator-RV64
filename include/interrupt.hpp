@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <cstdint>
 
 namespace Emulator {
     class Interrupt {
@@ -12,7 +13,7 @@ namespace Emulator {
             MACHINE_SOFTWARE = 3,
             USER_TIMER = 4,
             SUPERVISOR_TIMER = 5,
-            MACHINE_TIME = 7,
+            MACHINE_TIMER = 7,
             USER_EXTERNAL = 8,
             SUPERVISOR_EXTERNAL = 9,
             MACHINE_EXTERNAL = 11,

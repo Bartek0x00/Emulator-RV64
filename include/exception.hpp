@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string_view>
+#include <cstdint>
 
 namespace Emulator {
     class Exception {
@@ -13,7 +14,7 @@ namespace Emulator {
             BREAKPOINT = 3,
             LOAD_ADDRESS_MISALIGNED = 4,
             LOAD_ACCESS_FAULT = 5,
-            STORE_ADDRESS_MiSALIGNED = 6,
+            STORE_ADDRESS_MISALIGNED = 6,
             STORE_ACCESS_FAULT = 7,
             ECALL_UMODE = 8,
             ECALL_SMODE = 9,

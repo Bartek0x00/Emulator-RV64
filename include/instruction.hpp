@@ -4,6 +4,6 @@
 
 namespace Emulator {
 	namespace Instruction {
-		void execute(Decoder decoder);
+		uint64_t execute(Decoder decoder);
 	};
 };

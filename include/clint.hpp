@@ -19,11 +19,11 @@ namespace Emulator {
 	
 	public:
 		explicit inline Clint(void) : 
-			Device(0x2000000ULL, 0x10000ULL, "CLINT") {};
+			Device(0x2000000ULL, 0x10000ULL) {};
 		
 		uint64_t load(uint64_t addr, uint64_t len) override;
 		void store(uint64_t addr, uint64_t value, uint64_t len) override;
 		void dump(void) const override;
-		void tick(void) override;
+		void tick(void);
 	};
 };

@@ -1,8 +1,9 @@
 #include "terminal.hpp"
+#include "errors.hpp"
 
 using namespace Emulator;
 
-void reset(uint32_t _rows, uint32_t _cols, TTF_Font *_font)
+void Terminal::reset(int32_t _rows, int32_t _cols, TTF_Font *_font)
 {
     if (vterm) {
         vterm_free(vterm);
@@ -23,9 +24,9 @@ void reset(uint32_t _rows, uint32_t _cols, TTF_Font *_font)
     vterm_set_utf8(vterm, 1);
     vterm_output_set_callback(vterm, [](const char *str, size_t len, void *user) {}, nullptr);
 
-    vterm = vterm_obtain_screen(vterm);
+    screen = vterm_obtain_screen(vterm);
     vterm_screen_set_callbacks(screen, &screen_callbacks, this);
-    vterm_screen_reset(vterm, 1);
+    vterm_screen_reset(screen, 1);
 
     matrix.fill(0);
     TTF_SizeUTF8(font, "X", &font_width, nullptr);
@@ -35,13 +36,13 @@ void reset(uint32_t _rows, uint32_t _cols, TTF_Font *_font)
     );
 }
 
-void render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
+void Terminal::render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
 {
     if (texture)
         goto cursor;
 
-    for (uint32_t row = 0; row < matrix.rows; row++) {
-        for (uint32_t col = 0; col < matrix.cols; col++) {
+    for (int32_t row = 0; row < matrix.rows; row++) {
+        for (int32_t col = 0; col < matrix.cols; col++) {
             if (!matrix(row, col))
                 continue;
             
@@ -52,7 +53,7 @@ void render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
             if (cell.chars[0] == 0xFFFFFFFF)
                 continue;
 
-            icu::UnicodeString ustr;
+            icu_75::UnicodeString ustr;
             for (int i = 0; cell.chars[i] != 0 && i < VTERM_MAX_CHARS_PER_CELL; i++)
                 ustr.append(static_cast<UChar32>(cell.chars[i]));
 
@@ -98,7 +99,7 @@ void render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
 				.x = col * font_width,
 				.y = row * font_height,
 				.w = cell.width * font_width,
-				.h = cell.height * font_height
+				.h = font_height
 			};
 
 			SDL_FillRect(
@@ -121,7 +122,7 @@ void render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
 				if (U_FAILURE(status))
 					error<FAIL>("Unable to get NFKC normalizer");
 				
-				UnicodeString& ustr_normalized = 
+				icu_75::UnicodeString ustr_normalized = 
 					normalizer->normalize(ustr, status);
 				
 				if (U_SUCCESS(status))
@@ -153,7 +154,7 @@ cursor:
     SDL_Rect rect = {
         .x = window_rect.x + ((cursor_pos.col * font_width) * window_rect.w) / surface->w,
         .y = window_rect.y + ((cursor_pos.row * font_height) * window_rect.h) / surface->h,
-        .w = ((font_width * window_rect.w) / surface->w) * cell_width,
+        .w = ((font_width * window_rect.w) / surface->w) * cell.width,
         .h = (font_height * window_rect.h) / surface->h
     };
 
@@ -165,15 +166,15 @@ cursor:
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
     SDL_RenderDrawRect(renderer, &rect);
 
-    if (!ringing)
+    if (!is_ringing)
         return;
 
     SDL_SetRenderDrawColor(renderer, 255, 255, 255, 192);
     SDL_RenderFillRect(renderer, &window_rect);
-    ringing = 0;
+    is_ringing = 0;
 }
 
-void process_event(const SDL_Event& event)
+void Terminal::process_event(const SDL_Event& event)
 {
     if (event.type == SDL_TEXTINPUT) {
         const Uint8 *state = SDL_GetKeyboardState(nullptr);
@@ -256,33 +257,33 @@ void process_event(const SDL_Event& event)
 
 int Terminal::damage(VTermRect rect, void *user)
 {
-    user = reinterpret_cast<Terminal*>(user);
-    user->invalidate_texture();
-    user->matrix.fill(1);
+    Terminal *t_user = static_cast<Terminal*>(user);
+    t_user->invalidate_texture();
+    t_user->matrix.fill(1);
     return 0;
 }
 
 int Terminal::movecursor(VTermPos pos, VTermPos old_pos, int visible, void *user)
 {
-    reinterpret_cast<Terminal*>(user)->cursor_pos = pos;
+    static_cast<Terminal*>(user)->cursor_pos = pos;
     return 0;
 }
 
 int Terminal::bell(void *user)
 {
-    reinterpret_cast<Terminal*>(user)->ringing = true;
+    static_cast<Terminal*>(user)->is_ringing = true;
     return 0;
 }
 
 int Terminal::resize(int rows, int cols, void *user)
 {
-    user = reinterpret_cast<Terminal*>(user);
+    Terminal *t_user = static_cast<Terminal*>(user);
 
-    user->vterm_set_size(user->vterm, rows, cols);
-    user->matrix = Matrix<unsigned char>(rows, cols);
-    user->matrix.fill(1);
-    user->vterm_screen_reset(user->screen, 1);
-    user->invalidate_texture();
+    vterm_set_size(t_user->vterm, rows, cols);
+    t_user->matrix = Matrix<unsigned char>(rows, cols);
+    t_user->matrix.fill(1);
+    vterm_screen_reset(t_user->screen, 1);
+    t_user->invalidate_texture();
 
     return 0;
 }

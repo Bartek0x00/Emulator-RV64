@@ -6,9 +6,6 @@
 
 namespace Emulator {
     class IRegs {
-	private:
-		std::array<uint64_t, 32> regs;
-
 	public:
 		enum Name : uint64_t {
 			x0 = 0, x1,  
@@ -49,7 +46,7 @@ namespace Emulator {
 
     	explicit constexpr inline IRegs(void) : regs{} {};
 
-		inline uint64_t& operator[](Name index)
+		inline uint64_t& operator[](uint64_t index)
 		{
 			if (index >= 32)
 				error<FAIL>(
@@ -59,12 +56,12 @@ namespace Emulator {
 			
 			return regs[index];
 		}
+	
+	private:
+		std::array<uint64_t, 32> regs;
 	};
 
 	class FRegs {
-	private:
-		std::array<double, 32> regs;
-	
 	public:
 		enum Name : uint64_t {
 			ft0 = 0, ft1,
@@ -85,9 +82,16 @@ namespace Emulator {
 			ft10, ft11
 		};
 		
+		union FProxy {
+			double d;
+			float f;
+			uint64_t u64;
+			uint32_t u32;
+		};
+		
 		explicit constexpr inline FRegs(void) : regs{} {};
 
-		inline double& operator[](Name index)
+		inline FProxy& operator[](uint64_t index)
 		{
 			if (index >= 32)
 				error<FAIL>(
@@ -97,12 +101,12 @@ namespace Emulator {
 
 			return regs[index];
 		}
+
+	private:
+		std::array<FProxy, 32> regs;	
 	};
 
 	class CRegs {
-	private:
-		std::array<uint64_t, 4096> regs;
-
 	public:
 		struct Address {
 			enum : uint64_t {
@@ -278,7 +282,7 @@ namespace Emulator {
     		case Address::SIP:
         		return regs[Address::MIP] & regs[Address::MIDELEG];
    		 	case Address::MSTATUS:
-        		return regs[Address::MSTATUS] | 0x200000000ULL;
+        		return regs[Address::MSTATUS] | 0x0200000000ULL;
     		default:
         		return regs[addr];
     		}
@@ -309,5 +313,8 @@ namespace Emulator {
 				break;
 			}
 		}
+
+	private:
+		std::array<uint64_t, 4096> regs;
 	};
 };

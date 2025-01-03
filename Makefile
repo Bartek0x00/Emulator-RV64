@@ -1,20 +1,29 @@
 CXX=g++
-CXX_FLAGS=-std=c++20 -O3 -Iinclude/
-LD_FLAGS=-lSDL2
-SRCS=$(wildcard src/*.cpp)
+CXX_FLAGS=-std=c++20 -g3 -O3 -Iinclude/
+LD_FLAGS=-O3 -g3 -lm -licuuc -lvterm -lSDL2 -lSDL2_ttf
+SRCS=$(filter-out src/main.cpp, $(wildcard src/*.cpp))
 OBJS=$(SRCS:src/%.cpp=src/%.o)
 EXEC=rv64-emu
 
-.PHONY: all clean
+.PHONY: all test clean
 
-all: $(EXEC)
+all: $(OBJS) src/main.o
+	@echo "LINK $(EXEC)"
+	@$(CXX) $(OBJS) src/main.o -o $(EXEC) $(LD_FLAGS)
 	./$(EXEC)
 
-$(EXEC): $(OBJS)
-	$(CXX) $(OBJS) -o $@ $(LD_FLAGS)
+test: CXX_FLAGS+=-DEMU_DEBUG
+test: $(OBJS) test/test.o
+	@echo "LINK tmp_test"
+	@$(CXX) $(OBJS) test/test.o -o tmp_test $(LD_FLAGS)
+	@./tmp_test 2>logs.txt
+	@echo "Debug info dumped to logs.txt"
+	@rm tmp_test
 
-src/%.o: src/%.cpp
-	$(CXX) $(CXX_FLAGS) -c $< -o $@
+%.o: %.cpp
+	@echo "CXX $<"
+	@$(CXX) $(CXX_FLAGS) -c $< -o $@
 
 clean:
-	rm -rf src/*.o
+	@echo "CLEANING..."
+	@rm -rf src/*.o

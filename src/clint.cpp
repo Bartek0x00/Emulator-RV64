@@ -1,7 +1,7 @@
 #include "common.hpp"
 #include "errors.hpp"
 #include "registers.hpp"
-#include "emulator.hpp"
+#include "cpu.hpp"
 #include "clint.hpp"
 
 using namespace Emulator;
@@ -102,27 +102,30 @@ void Clint::dump(void) const
 void Clint::tick(void)
 {
 	mtime = get_milliseconds() * 1000;
-	cpu.csr_regs.store(CRegs::Address::TIME, mtime);
+	cpu->csr_regs.store(CRegs::Address::TIME, mtime);
 
 	if (msip & 1)
-		cpu.csr_regs.store(
+		cpu->csr_regs.store(
+			CRegs::Address::MIP,
 			write_bit(
-				cpu.csr_regs.load(CRegs::Address::MIP), 
+				cpu->csr_regs.load(CRegs::Address::MIP), 
 				CRegs::Mask::MSIP_BIT, 1
 			)
 		);
 
 	if (mtime >= mtimecmp)
-		cpu.csr_regs.store(
+		cpu->csr_regs.store(
+			CRegs::Address::MIP,
 			write_bit(
-				cpu.csr_regs.load(CRegs::Address::MIP), 
+				cpu->csr_regs.load(CRegs::Address::MIP), 
 				CRegs::Mask::MTIP_BIT, 1
 			)
 		);
 	else
-		cpu.csr_regs.store(
+		cpu->csr_regs.store(
+			CRegs::Address::MIP,
 			write_bit(
-				cpu.csr_regs.load(CRegs::Address::MIP), 
+				cpu->csr_regs.load(CRegs::Address::MIP), 
 				CRegs::Mask::MTIP_BIT, 0
 			)
 		);

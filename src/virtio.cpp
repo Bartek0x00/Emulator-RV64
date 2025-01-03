@@ -1,8 +1,12 @@
 #include "virtio.hpp"
+#include "errors.hpp"
+#include "bus.hpp"
 
 using namespace Emulator;
 
-Virtio::Virtio(std::vector<uint8_t> data)
+Virtio::Virtio(std::vector<uint8_t> data) :
+	Device(VIRTIO_BASE, VIRTIO_SIZE),
+	rfsimg(std::move(data))
 {
 	queue_notify = QUEUE_NOTIFY_RESET;
 
@@ -22,56 +26,64 @@ void Virtio::update(void)
 	vq.avail = vq.desc + (vq.num * sizeof(VirtqDesc));
 	vq.used = align_up(
 		vq.avail + \
-		offof(VRingAvail, ring) + \
+		offsetof(VRingAvail, ring) + \
 		vq.num * sizeof(VRingAvail::ring[0]),
 		vq.align
 	);
 }
 
-VirtqDesc Virtio::load_desc(uint64_t addr)
+Virtio::VirtqDesc Virtio::load_desc(uint64_t addr)
 {
 	return {	
-		.addr = bus.load(addr, 64);
-		.len = bus.load(addr + 8, 32);
-		.flags = bus.load(addr + 12, 16);
-		.next = bus.load(addr + 14, 16);
+		.addr = static_cast<uint64_t>(
+			bus->load(addr, 64)
+		),
+		.len = static_cast<uint32_t>(
+			bus->load(addr + 8, 32)
+		),
+		.flags = static_cast<uint16_t>(
+			bus->load(addr + 12, 16)
+		),
+		.next = static_cast<uint16_t>(
+			bus->load(addr + 14, 16)
+		)
 	};
 }
 
 void Virtio::access_disk(void)
 {
-	uint16_t idx = bus.load(
-		vq.avail + offof(VRingAvail, idx),
+	uint16_t idx = bus->load(
+		vq.avail + offsetof(VRingAvail, idx),
 		16
 	);
 	
-	uint16_t desc_off = bus.load(
+	uint16_t desc_off = bus->load(
 		vq.avail + 4 + ((idx & vq.num) * 2),
 		16
 	);
 
-	VirtqDesc desc0 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc_off);
-	VirtqDesc desc1 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc0.next);
-	VirtqDesc desc2 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc1.next);
+	VirtqDesc desc0 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc_off));
+	VirtqDesc desc1 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc0.next));
+	VirtqDesc desc2 = load_desc(vq.desc + (sizeof(VirtqDesc) * desc1.next));
 
-	uint32_t blk_req_type = bus.load(desc0.addr, 32);
-	uint64_t blk_req_sector = bus.load(desc0.addr + 8, 64);
+	uint32_t blk_req_type = bus->load(desc0.addr, 32);
+	uint64_t blk_req_sector = bus->load(desc0.addr + 8, 64);
 
 	if (blk_req_type == BLK_T_OUT)
 		for (uint32_t i = 0; i < desc1.len; i++)
 			rfsimg[blk_req_sector * SECTOR_SIZE + i] = 
-				bus.load(desc1.addr + 1, 8);
+				bus->load(desc1.addr + 1, 8);
 	else
 		for (uint32_t i = 0; i < desc1.len; i++)
-			bus.store(
+			bus->store(
 				desc1.addr + i,
 				rfsimg[blk_req_sector * SECTOR_SIZE + i],
 				8
 			);
 	
-	bus.store(desc2.addr, BLK_S_OK, 8);
-	bus.store(vq.used + 4 + ((id % vq.num) * 8), desc_off, 16);
-	bus.store(vq.used + 2, ++id, 16);
+	bus->store(desc2.addr, BLK_S_OK, 8);
+	bus->store(vq.used + 4 + ((id % vq.num) * 8), desc_off, 16);
+	bus->store(vq.used + 2, ++id, 16);
 }
 
 uint64_t Virtio::load(uint64_t addr, uint64_t len)
@@ -95,7 +107,7 @@ uint64_t Virtio::load(uint64_t addr, uint64_t len)
 	};
 }
 
-void Virtio::store(uint64_t addr. uint64_t value, uint64_t len)
+void Virtio::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	addr -= base;
 

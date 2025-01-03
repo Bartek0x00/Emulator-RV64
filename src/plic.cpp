@@ -1,3 +1,4 @@
+#include <exception>
 #include "plic.hpp"
 
 using namespace Emulator;
@@ -35,6 +36,7 @@ uint64_t Plic::load(uint64_t addr, uint64_t len)
 	}
 
 	error<FAIL>("PLIC: Cannot access region at the address: ", addr);
+	throw std::exception();
 }
 
 void Plic::store(uint64_t addr, uint64_t value, uint64_t len)

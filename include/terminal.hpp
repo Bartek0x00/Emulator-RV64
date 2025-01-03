@@ -22,47 +22,51 @@ namespace Emulator {
 	template<typename T>
 	class Matrix {
 	private:
-		std::unique_ptr<T[]> data;
+		T *data = nullptr;
 	
 	public:
-		uint32_t rows;
-		uint32_t cols;
+		int32_t rows = 0;
+		int32_t cols = 0;
+		
+		constexpr inline Matrix() = default;
 
-		inline Matrix(uint32_t _rows, uint32_t _cols) : 
-			rows(_rows), cols(_cols),
-			data(std::make_unique<T[]>(rows * cols)) {};
+		inline Matrix(int32_t _rows, int32_t _cols) : 
+			rows(_rows), cols(_cols)
+		{
+			data = new T[cols * rows];
+		}
+
+		inline ~Matrix(void)
+		{
+			if (data)
+				delete[] data;
+		}
 
 		Matrix<T>& operator=(const Matrix& other)
 		{
-			if (this == &other) return *this;
+			if (data)
+				delete[] data;
 
-			if (rows != other.rows ||
-				cols != other.cols)
-			{
-				data = std::make_unique<T[]>(
-					other.rows * other.cols
-				);
+			rows = other.rows;
+			cols = other.cols;
 
-				rows = other.rows;
-				cols = other.cols;
-			}
+			data = new T[cols * rows];
 
-			std::memcpy(
-				data.get(),
-				other.data.get(),
-				rows * cols * sizeof(T)
-			);
-
+			std::memcpy(data, other.data, rows * cols);
+			
 			return *this;
 		}
 
 		Matrix<T>& operator=(Matrix&& other) noexcept
 		{
-			if (this == &other) return *this;
+			if (data)
+				delete[] data;
 
-			data = std::move(other.data);
 			rows = other.rows;
 			cols = other.cols;
+
+			data = other.data;
+			other.data = nullptr;
 
 			other.rows = 0;
 			other.cols = 0;
@@ -77,7 +81,7 @@ namespace Emulator {
 
 		inline T& operator()(uint32_t row, uint32_t col)
 		{
-			return data.get()[(row * cols) + col];
+			return data[(row * cols) + col];
 		}
 	};
 
@@ -97,28 +101,29 @@ namespace Emulator {
 		Matrix<unsigned char> matrix;
 		VTermPos cursor_pos;
 
-		VTerm *vterm = nullptr;
 		VTermScreen *screen = nullptr;
 		SDL_Surface *surface = nullptr;
 		SDL_Texture *texture = nullptr;
 		TTF_Font *font = nullptr;
 
-		uint32_t font_width = 0;
-		uint32_t font_height = 0;
+		int32_t font_width = 0;
+		int32_t font_height = 0;
 
 		bool is_ringing = false;
 	
 	public:
-		inline invalidate_texture(void)
+		VTerm *vterm = nullptr;
+
+		inline void invalidate_texture(void)
 		{
 			if (!texture)
 				return;
 
-			SDL_FreeTexture(texture);
+			SDL_DestroyTexture(texture);
 			texture = nullptr;
 		}
 
-		explicit inline Terminal(uint32_t rows, uint32_t cols, TTF_Font *font)
+		explicit inline Terminal(int32_t rows, int32_t cols, TTF_Font *font)
 		{
 			reset(rows, cols, font);
 		}
@@ -131,7 +136,7 @@ namespace Emulator {
 		}
 
 		static int damage(VTermRect rect, void *user);
-		static int moverrect(VTermRect dest, VTermRect src, void *user);
+		static int moverect(VTermRect dest, VTermRect src, void *user);
 		static int movecursor(VTermPos pos, VTermPos old_pos, int visible, void *user);
 		static int settermprop(VTermProp prop, VTermValue *value, void *user);
 		static int bell(void *user);
@@ -139,7 +144,7 @@ namespace Emulator {
 		static int sb_pushline(int cols, const VTermScreenCell *cells, void *user);
 		static int sb_popline(int cols, VTermScreenCell *cells, void *user);
 
-		void reset(uint32_t cols, uint32_t rows, TTF_Font *font);
+		void reset(int32_t _rows, int32_t _cols, TTF_Font *_font);
 		void render(SDL_Renderer *renderer, const SDL_Rect& window_rect);
 		void process_event(const SDL_Event& event);
 	};

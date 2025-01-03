@@ -1,15 +1,18 @@
 #include "errors.hpp"
 #include "gpu.hpp"
+#include "settings.hpp"
 #include "font.hpp"
 
 using namespace Emulator;
 
-Gpu::Gpu(uint32_t width, uint32_t height)
+Gpu::Gpu(uint32_t _width, uint32_t _height) :
+	Device(FB_RENDER, UART_SIZE),
+	width(_width), height(_height),
+	channels(3)
 {
 	if (SDL_Init(SDL_INIT_VIDEO))
 		error<FAIL>(
-			name,
-			": Cannot init SDL System: ",
+			"GPU: Cannot init SDL System: ",
 			SDL_GetError()
 		);
 
@@ -22,8 +25,7 @@ Gpu::Gpu(uint32_t width, uint32_t height)
 	);
 	if (!window)
 		error<FAIL>(
-			name,
-			": Cannot create SDL window: ",
+			"GPU: Cannot create SDL window: ",
 			SDL_GetError()
 		);
 	
@@ -33,8 +35,7 @@ Gpu::Gpu(uint32_t width, uint32_t height)
 	);
 	if (!renderer)
 		error<FAIL>(
-			name,
-			": Cannot create SDL renderer: ",
+			"GPU: Cannot create SDL renderer: ",
 			SDL_GetError()
 		);
 
@@ -46,42 +47,39 @@ Gpu::Gpu(uint32_t width, uint32_t height)
 	);
 	if (!texture)
 		error<FAIL>(
-			name,
-			": Cannot create SDL texture: ",
+			"GPU: Cannot create SDL texture: ",
 			SDL_GetError()
 		);
 	
 	if (TTF_Init())
 		error<FAIL>(
-			name,
-			": Cannot init TTF subsystem: ",
+			"GPU: Cannot init TTF subsystem: ",
 			SDL_GetError()
 		);
-
+/*
 	SDL_RWops *font_rw = SDL_RWFromMem(
 		font_ttf, font_ttf_len
 	);
 	if (!font_rw)
 		error<FAIL>(
-			name,
-			": Cannot create SDL_RWops: ",
-			SDL_GetError();
+			"GPU: Cannot create SDL_RWops: ",
+			SDL_GetError()
 		);
 	
 	font = TTF_OpenFontRW(font_rw, 0, 16);
 	SDL_RWclose(font_rw);
+*/
+	font = TTF_OpenFont("font.ttf", FONT_SIZE);
 	if (!font)
 		error<FAIL>(
-			name,
-			": Cannot load font from RW: ",
+			"GPU: Cannot load font from RW: ",
 			SDL_GetError()
 		);
 	
 	framebuffer = std::make_unique<uint8_t[]>(
 		width * height * channels
 	);
-
-	fb_size = width * height * channels;
+	fb_end += width * height * channels;
 	
 	terminal = std::make_unique<Terminal>(
 		term_rows, term_cols, font
@@ -111,7 +109,7 @@ uint64_t Gpu::load(uint64_t addr, uint64_t len)
 	if (addr == TERM_DIMENSIONS)
 		return (term_rows << 16) | term_cols;
 	
-	if (addr >= FB_START && addr <= FB_START + fb_size) {
+	if (addr >= FB_START && addr <= fb_end) {
 		addr -= FB_START;
 
 		switch (len) {
@@ -186,8 +184,7 @@ void Gpu::store(uint64_t addr, uint64_t value, uint64_t len)
 	}
 
 	default:
-		if (addr >= FB_START &&
-			addr <= FB_START + fb_size)
+		if (addr >= FB_START && addr <= fb_end)
 		{
 			addr -= FB_START;
 
@@ -207,12 +204,20 @@ void Gpu::store(uint64_t addr, uint64_t value, uint64_t len)
 			case THR:
 			{
 				char c = static_cast<char>(value);
-				terminal->input_write(&c, sizeof(c));
+				vterm_input_write(
+					terminal->vterm, 
+					&c, 
+					sizeof(c)
+				);
 				last_text = get_milliseconds();
 				
 				if (c == '\n') {
 					c = '\r';
-					terminal->input_write(&c, sizeof(c));
+					vterm_input_write(
+						terminal->vterm,
+						&c, 
+						sizeof(c)
+					);
 					render_textbuffer();
 				}
 
@@ -255,13 +260,13 @@ void Gpu::dump(void) const
 		"################################",
 		"\n# base: ", base,
 		"\n# size: ", size,
-		"\n# last_msg: ", last_msg,
-		"\n# last_tick: ", ladt_tick,
+		"\n# last_msg: ", last_text,
+		"\n# last_tick: ", last_tick,
 		"\n#\tframebuffer",
 		"\n# width: ", width,
 		"\n# height: ", height,
 		"\n# channels: ", channels,
-		"\n# size: ", fb_size,
+		"\n# size: ", fb_end,
 		"\n#\tterminal",
 		"\n# rows: ", term_rows,
 		"\n# cols: ", term_cols,
@@ -291,20 +296,21 @@ void Gpu::dispatch(void)
 	}
 }
 
+void Gpu::render(void)
+{
+	if ((last_text != ~0ULL) &&
+		(get_milliseconds() - last_text > 10))
+	{
+		render_textbuffer();
+	}
+}
+
 void Gpu::tick(void)
 {
 	uint64_t current_tick = get_milliseconds();
-	
-	auto _render = [](void) -> void {
-		if ((last_text != ~0ULL) && 
-			(get_milliseconds() - last_text > 10))
-		{
-			render_textbuffer();
-		}
-	};
 
 	if (current_tick - last_tick <= 10) {
-		_render();
+		render();
 		return;
 	}
 
@@ -312,7 +318,7 @@ void Gpu::tick(void)
 	SDL_Event event;
 
 	if (!SDL_PollEvent(&event)) {
-		_render();
+		render();
 		return;
 	}
 
@@ -330,7 +336,7 @@ void Gpu::tick(void)
 			if (event.key.keysym.sym == SDLK_d)
 				uart_putchar(0x4);
 			
-			_render();
+			render();
 			return;
 		}
 
@@ -364,7 +370,7 @@ void Gpu::tick(void)
 		break;
 	}
 
-	_render();
+	render();
 }
 
 void Gpu::render_framebuffer(void)
@@ -398,8 +404,10 @@ void Gpu::resize_screen(uint16_t _width, uint16_t _height)
 	height = _height;
 	SDL_SetWindowSize(window, width, height);
 
-	fb_size = width * height * channels;
-	framebuffer = make_unique<uint8_t[]>(fb_size);
+	uint32_t pixel_count = width * height * channels;
+	
+	fb_end = FB_START + pixel_count;
+	framebuffer = std::make_unique<uint8_t[]>(pixel_count);
 
 	SDL_DestroyTexture(texture);
 	texture = SDL_CreateTexture(

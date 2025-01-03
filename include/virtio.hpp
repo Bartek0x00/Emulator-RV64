@@ -11,7 +11,6 @@ namespace Emulator {
 		enum : uint64_t {
 			VIRTIO_BASE 	= 0x10001000ULL,
 			VIRTIO_SIZE 	= 0x1000ULL,
-			VIRTIO_IRQN 	= 0x1,
 			MAGIC_VALUE 	= 0x0,
 			VERSION 		= 0x4,
 			DEVICE_ID 		= 0x8,
@@ -100,19 +99,18 @@ namespace Emulator {
 		uint8_t status = 0;
 
 	public:
-		explicit Virtio(std::vector<uint8_t> data) :
-			Device(VIRTIO_BASE, VIRTIO_SIZE, "VIRTIO"),
-			rfsimg(std::move(data)) {};
+		explicit Virtio(std::vector<uint8_t> data);
 
 		uint64_t load(uint64_t addr, uint64_t len) override;
 		void store(uint64_t addr, uint64_t value, uint64_t len) override;
 		void dump(void) const override;
-		void tick(void) override;
 
-		inline uint32_t *interrupting(void)
+		inline const uint32_t *interrupting(void)
 		{
+			static const uint32_t VIRTIO_IRQN = 1;
+
 			if (isr & 1)
-				return VIRTIO_IRQN;
+				return &VIRTIO_IRQN;
 
 			return nullptr;
 		}
@@ -123,6 +121,7 @@ namespace Emulator {
 			isr = 0;
 		}
 		
+		void tick(void);
 		void update(void);
 		VirtqDesc load_desc(uint64_t addr);
 		void access_disk(void);

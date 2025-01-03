@@ -1,5 +1,6 @@
 #pragma once
 
+#include <fstream>
 #include <cstdint>
 #include <chrono>
 
@@ -11,7 +12,7 @@ namespace Emulator {
 	};
 
 	template<MemSize S>
-	constexpr inline uint64_t size(uint64_t num)
+	constexpr inline uint64_t BYTE_SIZE(uint64_t num)
 	{
 		switch (S) {
 		case KIB:
@@ -21,6 +22,18 @@ namespace Emulator {
 		case GIB:
 			return 1024 * 1024 * 1024 * num;
 		}
+	}
+	
+	template<typename T, typename Q>
+	constexpr inline auto SCAST(Q value)
+	{
+		return static_cast<int64_t>(static_cast<T>(value));
+	}
+
+	template<typename T, typename Q>
+	constexpr inline auto UCAST(Q value)
+	{
+		return static_cast<uint64_t>(SCAST<T>(value));
 	}
 
 	inline uint64_t get_milliseconds(void)
@@ -35,6 +48,22 @@ namespace Emulator {
 			now - start_time
 		).count();
 	}
+	
+	inline std::vector<uint8_t> load_file(std::string filename)
+	{
+		std::ifstream input(
+			filename,
+			std::ios::binary | std::ios::ate
+		);
+
+		std::streamsize size = input.tellg();
+		input.seekg(0, std::ios::beg);
+
+		std::vector<uint8_t> buffer(size);
+		input.read(reinterpret_cast<char*>(buffer.data()), size);
+
+		return buffer;
+	}	
 	
 	inline uint64_t read_bit(uint64_t value, uint64_t off)
 	{
@@ -52,9 +81,9 @@ namespace Emulator {
 		uint64_t off, uint64_t bit_value)
 	{
 		if (bit_value)
-			return value & ~(1ULL << off);
-		else
 			return value | (1ULL << off);
+		else
+			return value & ~(1ULL << off);
 	}
 
 	inline uint64_t write_bits(uint64_t value, uint64_t upper, 

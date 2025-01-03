@@ -3,54 +3,51 @@
 
 using namespace Emulator;
 
-Mmu mmu;
-
 uint64_t Mmu::load(uint64_t addr, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::LOAD);
 	
-	if (cpu.exc_val != Exception::NONE)
+	if (cpu->exception.current != Exception::NONE)
 		return 0;
 	
-	return bus.load(p_addr, len);
+	uint64_t value = bus->load(p_addr, len);
+	return value;
 }
 
 void Mmu::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::STORE);
 
-	if (cpu.exc_val != Exception::NONE)
+	if (cpu->exception.current != Exception::NONE)
 		return;
 
-	bus.store(p_addr, value, len);
+	bus->store(p_addr, value, len);
 }
 
 uint64_t Mmu::fetch(uint64_t addr, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::INSTRUCTION);
-	if (cpu.exc_val != Exception::NONE)
+	if (cpu->exception.current != Exception::NONE)
 		return 0;
 	
-	uint64_t value = bus.load(p_addr, len);
-	if (cpu.exc_val == Exception::LOAD_ACCESS_FAULT)
-		cpu.exc_val = Exception::INSTRUCTION_ACCESS_FAULT;
+	uint64_t value = bus->load(p_addr, len);
+	if (cpu->exception.current == Exception::LOAD_ACCESS_FAULT)
+		cpu->exception.current = Exception::INSTRUCTION_ACCESS_FAULT;
 	
 	return value;
 }
 
 void Mmu::update(void)
 {
-	uint64_t satp = cpu.csr_regs[CRegs::Address::SATP];
+	uint64_t satp = cpu->csr_regs.load(CRegs::Address::SATP);
 
 	mppn = read_bits(satp, 43, 0) << 12ULL;
-	mode = static_cast<ModeValue>(
-		read_bits(satp, 63, 60)
-	);
+	mode = read_bits(satp, 63, 60);
 
 	flush_tlb();
 }
 
-bool Mmu::fetch_pte(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode, TLBEntry& entry)
+bool Mmu::fetch_pte(uint64_t addr, uint64_t access_type, uint64_t cpu_mode, TLBEntry& entry)
 {
 	std::array<uint64_t, 5> vpn = get_vpn(addr);
 	uint64_t levels = get_levels();
@@ -61,7 +58,7 @@ bool Mmu::fetch_pte(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode, T
 
 	for (; i >= 0; i--) {
 		entry.pte_addr = tmp + vpn[i] * PTE_SIZE;
-		entry.pte = bus.load(entry.pte_addr, 64);
+		entry.pte = bus->load(entry.pte_addr, 64);
 		
 		entry.is_read = (entry.pte >> PteValue::READ) & 1;
 		entry.is_write = (entry.pte >> PteValue::WRITE) & 1;
@@ -111,7 +108,7 @@ bool Mmu::fetch_pte(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode, T
 	return true;
 }
 
-TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cpu_mode)
+Mmu::TLBEntry *Mmu::get_tlb_entry(uint64_t addr, uint64_t access_type, uint64_t cpu_mode)
 {
 	uint64_t addr_masked = addr & ~0xfffULL;
 	uint64_t oldest_tlb_age = 0;
@@ -128,16 +125,17 @@ TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cp
 
 			return &entry;
 		}
-	}
 
-	++entry.age;
+		++entry.age;
 
-	if (entry.age > oldest_tlb_age) {
-		oldest_tlb_age = entry.age;
-		oldest_tlb_index = i;
+		if (entry.age > oldest_tlb_age) {
+			oldest_tlb_age = entry.age;
+			oldest_tlb_index = i;
+		}
 	}
 
 	TLBEntry& entry = tlb_cache[oldest_tlb_index];
+	
 	if (fetch_pte(addr, access_type, cpu_mode, entry)) {
 		entry.virt_base = addr_masked;
 		entry.age = 0;
@@ -147,25 +145,38 @@ TLBEntry *Mmu::get_tlb_entry(uint64_t addr, AccessType access_type, Cpu::Mode cp
 	return nullptr;
 }
 
-uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
+uint64_t Mmu::translate(uint64_t addr, uint64_t access_type)
 {
-	if (mode == Mode::BARE)
+	if (mode == ModeValue::BARE)
 		return addr;
 	
-	Cpu::Mode cpu_mode = cpu.mode;
+	uint64_t cpu_mode = cpu->mode;
+	
+	uint64_t mprv = read_bit(
+		cpu->csr_regs.load(
+			CRegs::Address::MSTATUS
+		),
+		CRegs::Mstatus::MPRV
+	);
 
-	if (access_type != AccessType::INSTRUCTION &&
-		read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS), CRegs::Mask::MPRV) == 1)
+	if (access_type != AccessType::INSTRUCTION && (mprv == 1))
 	{
-		uint64_t mpp = read_bits(cpu.csr_regs.load(CRegs::Address::MSTATUS), 12, 11);
+		uint64_t mpp = read_bits(
+			cpu->csr_regs.load(
+				CRegs::Address::MSTATUS
+			), 
+			12, 11
+		);
 		
 		switch (mpp) {
 		case Cpu::Mode::USER:
 		case Cpu::Mode::SUPERVISOR:
 		case Cpu::Mode::MACHINE:
-			cpu_mode = static_cast<Cpu::Mode>(mpp);
+			cpu_mode = mpp;
+			break;
 		default:
 			cpu_mode = Cpu::Mode::INVALID;
+			break;
 		}
 	}
 
@@ -176,8 +187,18 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 	if (!entry)
 		return 0;
 	
-	bool mxr = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::MXR));
-	bool sum = read_bit(cpu.csr_regs.load(CRegs::Address::MSTATUS, CRegs::Mask::SUM));
+	bool mxr = read_bit(
+		cpu->csr_regs.load(
+			CRegs::Address::MSTATUS
+		), 
+		CRegs::Mstatus::MXR
+	);
+	bool sum = read_bit(
+		cpu->csr_regs.load(
+			CRegs::Address::MSTATUS
+		), 
+		CRegs::Mstatus::SUM
+	);
 
 	if ((!entry->is_read && entry->is_write && !entry->is_execute) ||
 		(!entry->is_read && entry->is_write && entry->is_execute)) 
@@ -226,8 +247,12 @@ uint64_t Mmu::translate(uint64_t addr, AccessType access_type)
 			entry->is_dirty = true;
 		}
 
-		bus.store(entry->pte_addr, entry->pte, 64);
+		bus->store(entry->pte_addr, entry->pte, 64);
 	}
 
-	return entry->phys_base | (address & 0xfffULL);
+	return entry->phys_base | (addr & 0xfffULL);
 }
+
+namespace Emulator {
+	std::unique_ptr<Mmu> mmu;
+};
