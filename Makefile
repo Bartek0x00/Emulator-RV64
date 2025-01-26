@@ -18,7 +18,6 @@ test: $(OBJS) test/test.o
 	@$(CXX) $(OBJS) test/test.o -o tmp_test $(LD_FLAGS)
 	@./tmp_test 2>logs.txt
 	@echo "Debug info dumped to logs.txt"
-	@rm tmp_test
 
 %.o: %.cpp
 	@echo "CXX $<"

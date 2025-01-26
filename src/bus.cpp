@@ -12,11 +12,8 @@ Device *Bus::get(uint64_t addr) const
 		if (!device)
 			continue;
 
-		if (addr >= device->base && 
-			addr < device->base + device->size)
-		{
+		if (addr >= device->base && addr < device->base + device->size)
 			return device;
-		}
 	}
 
 	return nullptr;
@@ -38,7 +35,7 @@ uint64_t Bus::load(uint64_t addr, uint64_t len)
 void Bus::store(uint64_t addr, uint64_t value, uint64_t len)
 {
 	Device *device = get(addr);
-
+	
 	if (device)
 		device->store(addr, value, len);
 	else

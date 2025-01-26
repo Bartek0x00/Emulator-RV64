@@ -10,20 +10,17 @@ uint64_t Plic::load(uint64_t addr, uint64_t len)
 	{
 		return priority[(addr - PRIORITY_BASE) / 4];
 	}
-
-	if (addr >= PENDING_BASE &&
+	else if (addr >= PENDING_BASE &&
 		addr <= PENDING_BASE + PENDING_SIZE)
 	{
 		return pending[(addr - PENDING_BASE) / 4];
 	}
-
-	if (addr >= ENABLE_BASE &&
+	else if (addr >= ENABLE_BASE &&
 		addr <= ENABLE_BASE + ENABLE_SIZE)
 	{
 		return enable[(addr - ENABLE_BASE) / 4];
 	}
-
-	if (addr >= TRESHOLD_CLAIM_BASE &&
+	else if (addr >= TRESHOLD_CLAIM_BASE &&
 		addr <= TRESHOLD_CLAIM_BASE + TRESHOLD_CLAIM_SIZE)
 	{
 		uint64_t ctx = (addr - TRESHOLD_CLAIM_BASE) / 0x1000ULL;
@@ -35,8 +32,7 @@ uint64_t Plic::load(uint64_t addr, uint64_t len)
 			return claim[ctx];
 	}
 
-	error<FAIL>("PLIC: Cannot access region at the address: ", addr);
-	throw std::exception();
+	return 0;
 }
 
 void Plic::store(uint64_t addr, uint64_t value, uint64_t len)
@@ -46,20 +42,17 @@ void Plic::store(uint64_t addr, uint64_t value, uint64_t len)
 	{
 		priority[(addr - PRIORITY_BASE) / 4] = value;
 	}
-
-	if (addr >= PENDING_BASE &&
+	else if (addr >= PENDING_BASE &&
 		addr <= PENDING_BASE + PENDING_SIZE)
 	{
 		pending[(addr - PENDING_BASE) / 4] = value;
 	}
-
-	if (addr >= ENABLE_BASE &&
+	else if (addr >= ENABLE_BASE &&
 		addr <= ENABLE_BASE + ENABLE_SIZE)
 	{
 		enable[(addr - ENABLE_BASE) / 4] = value;
 	}
-
-	if (addr >= TRESHOLD_CLAIM_BASE &&
+	else if (addr >= TRESHOLD_CLAIM_BASE &&
 		addr <= TRESHOLD_CLAIM_BASE + TRESHOLD_CLAIM_SIZE)
 	{
 		uint64_t ctx = (addr - TRESHOLD_CLAIM_BASE) / 0x1000ULL;
@@ -70,8 +63,6 @@ void Plic::store(uint64_t addr, uint64_t value, uint64_t len)
 		else if (off == 4)
 			clear_pending(value);
 	}
-
-	error<FAIL>("PLIC: Cannot write to region at the address: ", addr);
 }
 
 void Plic::dump(void) const

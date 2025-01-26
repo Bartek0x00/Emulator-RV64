@@ -11,25 +11,25 @@ namespace Emulator {
 		using Region = std::array<uint32_t, S>;
 
 		Region<1024> priority;
-		static constexpr uint64_t PRIORITY_BASE = 0xC000000;
-		static constexpr uint64_t PRIORITY_SIZE = 0xFFF;
+		static constexpr uint64_t PRIORITY_BASE = 0x0C000000ULL;
+		static constexpr uint64_t PRIORITY_SIZE = 0xFFFULL;
 
 		Region<32> pending;
-		static constexpr uint64_t PENDING_BASE = 0xC001000;
-		static constexpr uint64_t PENDING_SIZE = 0x7F;
+		static constexpr uint64_t PENDING_BASE = 0x0C001000ULL;
+		static constexpr uint64_t PENDING_SIZE = 0x7FULL;
 
 		Region<64> enable;
-		static constexpr uint64_t ENABLE_BASE = 0xC002000;
-		static constexpr uint64_t ENABLE_SIZE = 0xFF;
+		static constexpr uint64_t ENABLE_BASE = 0x0C002000ULL;
+		static constexpr uint64_t ENABLE_SIZE = 0xFFULL;
 
 		Region<2> treshold;
 		Region<2> claim;
-		static constexpr uint64_t TRESHOLD_CLAIM_BASE = 0xC200000;
-		static constexpr uint64_t TRESHOLD_CLAIM_SIZE = 0x1007;
+		static constexpr uint64_t TRESHOLD_CLAIM_BASE = 0x0C200000ULL;
+		static constexpr uint64_t TRESHOLD_CLAIM_SIZE = 0x1007ULL;
 	
 	public:
 		explicit inline Plic(void) : 
-			Device(0xC000000ULL, 0x208000ULL) {};
+			Device(0x0C000000ULL, 0x208000ULL) {};
 
 		inline bool is_enabled(uint64_t ctx, uint64_t irq)
 		{

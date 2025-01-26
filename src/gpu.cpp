@@ -6,7 +6,7 @@
 using namespace Emulator;
 
 Gpu::Gpu(uint32_t _width, uint32_t _height) :
-	Device(FB_RENDER, UART_SIZE),
+	Device(FB_RENDER, (UART_BASE + UART_SIZE) - FB_RENDER),
 	width(_width), height(_height),
 	channels(3)
 {
@@ -56,7 +56,7 @@ Gpu::Gpu(uint32_t _width, uint32_t _height) :
 			"GPU: Cannot init TTF subsystem: ",
 			SDL_GetError()
 		);
-/*
+
 	SDL_RWops *font_rw = SDL_RWFromMem(
 		font_ttf, font_ttf_len
 	);
@@ -66,16 +66,13 @@ Gpu::Gpu(uint32_t _width, uint32_t _height) :
 			SDL_GetError()
 		);
 	
-	font = TTF_OpenFontRW(font_rw, 0, 16);
-	SDL_RWclose(font_rw);
-*/
-	font = TTF_OpenFont("font.ttf", FONT_SIZE);
+	font = TTF_OpenFontRW(font_rw, 1, FONT_SIZE);
 	if (!font)
 		error<FAIL>(
-			"GPU: Cannot load font from RW: ",
+			"GPU: Cannot open font from RW: ",
 			SDL_GetError()
 		);
-	
+
 	framebuffer = std::make_unique<uint8_t[]>(
 		width * height * channels
 	);

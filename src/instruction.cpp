@@ -88,8 +88,9 @@ static void sw(Decoder decoder)
 {
     uint64_t rs1 = decoder.rs1_c();
     uint64_t rs2 = decoder.rs2_c();
-    uint64_t off = ((decoder.insn << 1U) & 0x40U) | ((decoder.insn >> 7U) & 0x38U) |
-                	((decoder.insn >> 4U) & 0x04U);
+    uint64_t off = ((decoder.insn << 1U) & 0x40U) | 
+				   ((decoder.insn >> 7U) & 0x38U) |
+                   ((decoder.insn >> 4U) & 0x04U);
 
     uint64_t addr = cpu->int_regs[rs1] + off;
     uint32_t val = cpu->int_regs[rs2];
@@ -101,7 +102,8 @@ static void sd(Decoder decoder)
 {
     uint64_t rs1 = decoder.rs1_c();
     uint64_t rs2 = decoder.rs2_c();
-    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | ((decoder.insn >> 7U) & 0x38U);
+    uint64_t off = ((decoder.insn << 1U) & 0xc0U) | 
+				   ((decoder.insn >> 7U) & 0x38U);
 
     uint64_t addr = cpu->int_regs[rs1] + off;
     uint64_t val = cpu->int_regs[rs2];
@@ -128,7 +130,24 @@ static void op3(Decoder decoder)
 	uint64_t rd = decoder.rs1_c();
 	uint64_t rs2 = decoder.rs2_c();
 
-	if (val1) {
+	if (!val1) {
+		switch (val2) {
+		case 0:
+			cpu->int_regs[rd] -= cpu->int_regs[rs2];
+			break;
+		case 1:
+			cpu->int_regs[rd] ^= cpu->int_regs[rs2];
+			break;
+		case 2:
+			cpu->int_regs[rd] |= cpu->int_regs[rs2];
+			break;
+		case 3:
+			cpu->int_regs[rd] &= cpu->int_regs[rs2];
+			break;
+		default:
+			break;
+		}
+	} else {
 		switch (val2) {
 		case 0:
 			cpu->int_regs[rd] = UCAST<int32_t>(
@@ -146,24 +165,7 @@ static void op3(Decoder decoder)
 				decoder.insn
 			);
 			break;
-		}
-	} else {
-		switch (val2) {
-		case 0:
-			cpu->int_regs[rd] -= cpu->int_regs[rs2];
-			break;
-		case 1:
-			cpu->int_regs[rd] ^= cpu->int_regs[rs2];
-			break;
-		case 2:
-			cpu->int_regs[rd] |= cpu->int_regs[rs2];
-			break;
-		case 3:
-			cpu->int_regs[rd] &= cpu->int_regs[rs2];
-			break;
-		default:
-			break;
-		}
+		}			
 	}
 }
 
@@ -347,16 +349,17 @@ static void op4(Decoder decoder)
 
 	if (val1) {
 		if (val2)
-			cpu->int_regs[rd] = cpu->int_regs[rs1];
-		else
-			cpu->pc = (cpu->int_regs[rd] - 2);
-	} else {
-		if (val2)
 			cpu->int_regs[rd] += cpu->int_regs[rs1];
 		else {
+			uint64_t tmp = cpu->pc + 2;
 			cpu->pc = (cpu->int_regs[rd] - 2);
-			cpu->int_regs[IRegs::ra] = (cpu->pc + 2);
-		}
+			cpu->int_regs[IRegs::ra] = tmp;
+		}	
+	} else {
+		if (val2)
+			cpu->int_regs[rd] = cpu->int_regs[rs1];
+		else
+			cpu->pc = cpu->int_regs[rd] - 2;
 	}
 }
 
@@ -454,6 +457,7 @@ static void quadrant1(Decoder decoder)
 			C::lui(decoder);
 			break;
 		}
+		break;
 	case Decoder::Q1::OP04:
 		switch (decoder.funct2_c()) {
 		case Decoder::Q1::SRLI:
@@ -467,6 +471,7 @@ static void quadrant1(Decoder decoder)
 			break;
 		case Decoder::Q1::OP03:
 			C::op3(decoder);
+			break;
 		default:
 			cpu->set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -474,6 +479,7 @@ static void quadrant1(Decoder decoder)
 			);
 			break;
 		}
+		break;
 	case Decoder::Q1::J:
 		C::j(decoder);
 		break;
@@ -572,8 +578,7 @@ static void funct3(Decoder decoder)
 			)
 		);
 		break;
-	case Decoder::LdType::LD:
-		
+	case Decoder::LdType::LD:		
 		ASSIGN_IF_NO_EXC(
 			rd,
 			SCAST<int64_t>(
@@ -1092,6 +1097,7 @@ static void funct3(Decoder decoder)
 				Exception::ILLEGAL_INSTRUCTION,
 				decoder.insn
 			);
+			break;
 		}
 		break;
 	}
@@ -1185,28 +1191,28 @@ static inline bool is_cnanf(float valf)
 {
 	uint32_t nan_raw = 0x7fc00000U;
 	uint32_t val = std::bit_cast<uint32_t>(valf);
-	return nan_raw == val;
+	return nan_raw == (val & 0x7fffffffU);
 }
 
 static inline bool is_cnand(double vald)
 {
 	uint64_t nan_raw = 0x7ff8000000000000ULL;
 	uint64_t val = std::bit_cast<uint64_t>(vald);
-	return nan_raw == val;
+	return nan_raw == (val & 0x7fffffffffffffffULL);
 }
 
 static inline bool is_snanf(float valf)
 {
 	uint32_t snan_raw = 0x7f800001U;
 	uint32_t val = std::bit_cast<uint32_t>(valf);
-	return snan_raw == val;
+	return snan_raw == (val & 0x7fffffffU);
 }
 
 static inline bool is_snand(double vald)
 {
 	uint64_t snan_raw = 0x7ff0000000000001ULL;
 	uint64_t val = std::bit_cast<uint64_t>(vald);
-	return snan_raw == val;
+	return snan_raw == (val & 0x7fffffffffffffffULL);
 }
 
 template<typename T>
@@ -1234,6 +1240,7 @@ static T round(T val, Decoder decoder)
 		cpu->set_exception(
 			Exception::ILLEGAL_INSTRUCTION
 		);
+		break;
 	}
 
 	if (newval != val)
@@ -1611,34 +1618,46 @@ static void fother(Decoder decoder)
 	}
 	case Decoder::FdType::FSUBS:
 	{
-		float res = val1f - val2f;
-		if (is_cnanf(res))
+		FRegs::FProxy res;
+		res.f = val1f - val2f;
+
+		if (is_cnanf(res.f)) {
 			cpu->csr_regs.store(
 				CRegs::Address::FFLAGS,
 				cpu->csr_regs.load(
 					CRegs::Address::FFLAGS
 				) | CRegs::FExcept::INVALID
 			);
+			
+			res.u32 &= 0x7fffffffU;
+		}
 
-		uint32_t tmp = std::bit_cast<uint32_t>(res);
-		if (tmp == 0xff800000U)
-			cpu->flt_regs[rd].u32 = 0x7f800000U;
-		else
-			cpu->flt_regs[rd].u32 = tmp;
+		if (is_snanf(res.f))
+			res.u32 &= 0x7fffffffU;
+		
+		cpu->flt_regs[rd].u32 = res.u32;
 		break;
 	}
 	case Decoder::FdType::FSUBD:
 	{
-		double res = val1d - val2d;
-		if (is_cnand(res))
+		FRegs::FProxy res;
+		res.d = val1d - val2d;
+
+		if (is_cnand(res.d)) {
 			cpu->csr_regs.store(
 				CRegs::Address::FFLAGS,
 				cpu->csr_regs.load(
 					CRegs::Address::FFLAGS
 				) | CRegs::FExcept::INVALID
 			);
+			
+			res.u64 &= 0x7fffffffffffffffULL;
+		}
+
+		if (is_snand(res.d))
+			res.u64 &= 0x7fffffffffffffffULL;
 		
-		cpu->flt_regs[rd].d = res;
+		cpu->flt_regs[rd].u64 = res.u64;
 		break;
 	}
 	case Decoder::FdType::FMULS:
@@ -1872,6 +1891,7 @@ static void fother(Decoder decoder)
 		if (std::isnan(val))
 			val = std::numeric_limits<float>::quiet_NaN();
 		
+		cpu->flt_regs[rd].d = 0.0;	
 		cpu->flt_regs[rd].f = val;
 		break;
 	}
@@ -2036,7 +2056,7 @@ static void fother(Decoder decoder)
 	}
 	case Decoder::FdType::FCVTD:
 	{
-		double val = round(
+		double val = round<double>(
 			cpu->flt_regs[rs1].d,
 			decoder
 		);
@@ -2048,7 +2068,7 @@ static void fother(Decoder decoder)
 			);
 			break;
 		case Decoder::FdType::FCVT1:
-			cpu->int_regs[rd] = UCAST<int32_t>(
+			cpu->int_regs[rd] = UCAST<uint32_t>(
 				try_convert<uint32_t>(val)
 			);
 			break;
@@ -2070,7 +2090,8 @@ static void fother(Decoder decoder)
 	case Decoder::FdType::FCVTSW:
 	{
 		int64_t val = cpu->int_regs[rs1];
-			
+		cpu->flt_regs[rd].d = 0.0;
+
 		switch (rs2) {
 		case Decoder::FdType::FCVT0:
 			cpu->flt_regs[rd].f = static_cast<int32_t>(val);
@@ -2322,12 +2343,12 @@ static void funct3(Decoder decoder)
 
 		switch (decoder.funct5()) {
 		case Decoder::AType::ADD:
-			mmu->store(addr, val1 + val2, 32);
-			cpu->int_regs[rd] = static_cast<int64_t>(val1);
+			mmu->store(addr, static_cast<int32_t>(val1 + val2), 32);
+			cpu->int_regs[rd] = UCAST<int32_t>(val1);
 			break;
 		case Decoder::AType::SWAP:
 			mmu->store(addr, val2, 32);
-			cpu->int_regs[rd] = static_cast<int64_t>(val1);
+			cpu->int_regs[rd] = UCAST<int32_t>(val1);
 			break;
 		case Decoder::AType::LR:
 			cpu->int_regs[rd] = UCAST<int32_t>(val1);
@@ -2338,7 +2359,7 @@ static void funct3(Decoder decoder)
 				cpu->reservations.erase(addr);
 				mmu->store(
 					addr, 
-					static_cast<uint32_t>(val2), 
+					static_cast<uint32_t>(cpu->int_regs[rs2]), 
 					32
 				);
 				cpu->int_regs[rd] = 0;
@@ -2390,8 +2411,8 @@ static void funct3(Decoder decoder)
 			mmu->store(
 				addr,
 				std::min(
-					static_cast<uint32_t>(val1),
-					static_cast<uint32_t>(val2)
+					static_cast<uint32_t>(mmu->load(addr, 32)),
+					static_cast<uint32_t>(cpu->int_regs[rs2])
 				),
 				32
 			);
@@ -2401,8 +2422,8 @@ static void funct3(Decoder decoder)
 			mmu->store(
 				addr,
 				std::max(
-					static_cast<uint32_t>(val1),
-					static_cast<uint32_t>(val2)
+					static_cast<uint32_t>(mmu->load(addr, 32)),
+					static_cast<uint32_t>(cpu->int_regs[rs2])
 				),
 				32
 			);
@@ -2450,7 +2471,7 @@ static void funct3(Decoder decoder)
 				cpu->reservations.erase(addr);
 				mmu->store(
 					addr,
-					static_cast<uint64_t>(val2),
+					static_cast<uint64_t>(cpu->int_regs[rs2]),
 					64
 				);
 				cpu->int_regs[rd] = 0;
@@ -2469,10 +2490,10 @@ static void funct3(Decoder decoder)
 		case Decoder::AType::OR:
 			mmu->store(
 				addr,
-				static_cast<int64_t>(val1 | val2),
+				UCAST<int64_t>(val1 | val2),
 				64
 			);
-			cpu->int_regs[rd] = static_cast<int64_t>(val1);
+			cpu->int_regs[rd] = UCAST<int64_t>(val1);
 			break;
 		case Decoder::AType::AND:
 			mmu->store(
@@ -2502,8 +2523,8 @@ static void funct3(Decoder decoder)
 			mmu->store(
 				addr,
 				UCAST<uint64_t>(std::min(
-					static_cast<uint64_t>(val1),
-					static_cast<uint64_t>(val2)
+					static_cast<uint64_t>(mmu->load(addr, 64)),
+					static_cast<uint64_t>(cpu->int_regs[rs2])
 				)),
 				64
 			);
@@ -2513,8 +2534,8 @@ static void funct3(Decoder decoder)
 			mmu->store(
 				addr,
 				UCAST<uint64_t>(std::max(
-					static_cast<uint64_t>(val1),
-					static_cast<uint64_t>(val2)
+					static_cast<uint64_t>(mmu->load(addr, 64)),
+					static_cast<uint64_t>(cpu->int_regs[rs2])
 				)),
 				64
 			);
@@ -2707,11 +2728,7 @@ static void satp_h(Decoder decoder,
 			decoder.insn
 		);
 	
-	uint64_t rd = decoder.rd();
-	uint64_t csr_val = cpu->csr_regs.load(csr);
-
-	cpu->csr_regs.store(csr, op(csr_val, rhs));
-	cpu->int_regs[rd] = csr_val;
+	default_h(decoder, csr, rhs, op);
 
 	mmu->update();
 }
@@ -2745,7 +2762,7 @@ static void sret(Decoder decoder)
 		CRegs::Mstatus::TSR
 	);
 	
-	if (tsr || cpu->mode == Cpu::Mode::USER) {
+	if ((tsr == 1) || cpu->mode == Cpu::Mode::USER) {
 		cpu->set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
 			decoder.insn
@@ -2821,9 +2838,9 @@ static void mret(Decoder decoder)
 		);
 		return;
 	}
-
-	cpu->pc = cpu->csr_regs.load(CRegs::Address::MEPC) - 4;
 	
+	cpu->pc = cpu->csr_regs.load(CRegs::Address::MEPC) - 4;
+
 	uint64_t mpp_bits = read_bits(
 		cpu->csr_regs.load(
 			CRegs::Address::MSTATUS
@@ -2901,16 +2918,23 @@ static void environment(Decoder decoder)
 
 	switch (funct7) {
 	case Decoder::CSRType::SFENCEVMA7:
-		if ((read_bit(cpu->csr_regs.load(CRegs::Address::MSTATUS), CRegs::Mstatus::TVM) == 1) || 
-			cpu->mode == Cpu::Mode::USER)
-		{	
+	{
+		uint64_t tvm = read_bit(
+			cpu->csr_regs.load(
+				CRegs::Address::MSTATUS
+			),
+			CRegs::Mstatus::TVM
+		);
+		
+		if (tvm == 1 || cpu->mode == Cpu::Mode::USER)
 			cpu->set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
 				decoder.insn
 			);
-		}
+		
 		mmu->update();
 		return;
+	}
 	case Decoder::CSRType::HFENCEBVMA7:
 		cpu->set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
@@ -2961,18 +2985,13 @@ static void environment(Decoder decoder)
 		break;
 	case Decoder::CSRType::RET:
 		switch (funct7) {
-		case Decoder::CSRType::URET7:
-			cpu->set_exception(
-				Exception::ILLEGAL_INSTRUCTION,
-				decoder.insn
-			);
-			break;
 		case Decoder::CSRType::SRET7:
 			sret(decoder);
 			break;
 		case Decoder::CSRType::MRET7:
 			mret(decoder);
 			break;
+		case Decoder::CSRType::URET7:
 		default:
 			cpu->set_exception(
 				Exception::ILLEGAL_INSTRUCTION,
@@ -2984,6 +3003,9 @@ static void environment(Decoder decoder)
 	case Decoder::CSRType::WFI:
 		switch (funct7) {
 		case Decoder::CSRType::WFI7:
+		#ifndef EMU_DEBUG
+			cpu->sleep = true;
+		#endif
 			break;
 		default:
 			cpu->set_exception(
@@ -3114,7 +3136,7 @@ static void jalr(Decoder decoder)
 	uint64_t tmp = cpu->pc + 4;
 	int64_t val = cpu->int_regs[rs1];
 	
-	cpu->pc = ((val + imm) & ~1) - 4;
+	cpu->pc = ((val + imm) & ~1U) - 4;
 	cpu->int_regs[rd] = tmp;
 }
 
@@ -3122,7 +3144,7 @@ static void auipc(Decoder decoder)
 {
 	uint64_t rd = decoder.rd();
 	int64_t imm = UCAST<int32_t>(
-		decoder.insn & 0xfffff000U
+		decoder.insn & 0xfffff000ULL
 	);
 
 	cpu->int_regs[rd] = cpu->pc + imm;
@@ -3133,7 +3155,7 @@ static void lui(Decoder decoder)
 	uint64_t rd = decoder.rd();
 
 	cpu->int_regs[rd] = UCAST<int32_t>(
-		decoder.insn & 0xfffff000U
+		decoder.insn & 0xfffff000ULL
 	);
 }
 

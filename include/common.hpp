@@ -70,8 +70,7 @@ namespace Emulator {
 		return !!(value & (1ULL << off));
 	}
 
-	inline uint64_t read_bits(uint64_t value, 
-		uint64_t upper, uint64_t lower)
+	inline uint64_t read_bits(uint64_t value, uint64_t upper, uint64_t lower)
 	{
 		uint64_t mask = (1ULL << (upper - lower + 1ULL)) - 1ULL;
 		return (value >> lower) & mask;

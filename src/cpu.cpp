@@ -1,4 +1,5 @@
 #include <bit>
+#include <csignal>
 #include "clint.hpp"
 #include "gpu.hpp"
 #include "virtio.hpp"
@@ -142,7 +143,7 @@ uint32_t Cpu::_iterate(void)
 		);
 		return 4;
 	}
-	
+
 	return Instruction::execute(decoder);
 }
 

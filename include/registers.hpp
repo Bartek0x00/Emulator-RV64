@@ -291,18 +291,22 @@ namespace Emulator {
 		inline void store(uint64_t addr, uint64_t value)
 		{
 			switch(addr) {
-			case Address::SSTATUS: {
-        		uint64_t val = (regs[Address::MSTATUS] & ~Mask::SSTATUS) | (value & Mask::SSTATUS);
+			case Address::SSTATUS: 
+			{
+        		uint64_t val = (regs[Address::MSTATUS] & ~Mask::SSTATUS) | 
+					(value & Mask::SSTATUS);
         		regs[Address::MSTATUS] = val;
         		break;
     		}
-    		case Address::SIE: {
-        		uint64_t val =
-            	(regs[Address::MIE] & ~regs[Address::MIDELEG]) | (value & regs[Address::MIDELEG]);
+    		case Address::SIE: 
+			{
+        		uint64_t val = (regs[Address::MIE] & ~regs[Address::MIDELEG]) | 
+					(value & regs[Address::MIDELEG]);
         		regs[Address::MIE] = val;
         		break;
     		}
-    		case Address::SIP: {
+    		case Address::SIP: 
+			{
         		uint64_t mask = regs[Address::MIDELEG] & Mask::SSIP;
         		uint64_t val = (regs[Address::MIP] & ~mask) | (value & mask);
        			regs[Address::MIP] = val;
