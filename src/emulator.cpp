@@ -62,13 +62,13 @@ Emulator::Emulator::Emulator(int argc, char *argv[])
 		{"kernel", required_argument, nullptr, 'k'},
 		{"ram_size", required_argument, nullptr, 'r'},
 		{"virtual_drive", required_argument, nullptr, 'v'},
-		{}
+		{"help", no_argument, nullptr, 'h'}
 	};
 	
 	int opt = 0;
 	int opt_idx = 0;
 
-	while ((opt = getopt_long(argc, argv, "b:d:k:r:v:", 
+	while ((opt = getopt_long(argc, argv, "b:d:k:r:v:h:", 
 							long_options, &opt_idx)
 	) != -1) {
 		switch (opt) {
@@ -92,11 +92,12 @@ Emulator::Emulator::Emulator(int argc, char *argv[])
 			error<FAIL>(
 				"Usage: ", argv[0], " [options]\n"
 				"options: \n"
-				"  -b, --bios 			Path to the BIOS file (required)\n"
-				"  -d, --dtb  			Path to the DTB file (required if kernel provided)\n"
-				"  -k, --kernel 		Path to the kernel file\n"
-				"  -r, --ram_size 		Size of RAM to use in MiB (default 64 MiB)\n"
-				"  -v, --virtual_drive 	Path to the virtual disk image\n"
+				"  -b, --bios			Path to the BIOS file (required)\n"
+				"  -d, --dtb			Path to the DTB file (required if kernel provided)\n"
+				"  -k, --kernel			Path to the kernel file\n"
+				"  -r, --ram_size		Size of RAM to use in MiB (default 64 MiB)\n"
+				"  -v, --virtual_drive	Path to the virtual disk image\n"
+				"  -h, --help			This help message\n"
 			);
 			break;
 		}

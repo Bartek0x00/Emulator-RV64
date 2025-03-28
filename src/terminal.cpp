@@ -53,7 +53,7 @@ void Terminal::render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
             if (cell.chars[0] == 0xFFFFFFFF)
                 continue;
 
-            icu_75::UnicodeString ustr;
+            icu::UnicodeString ustr;
             for (int i = 0; cell.chars[i] != 0 && i < VTERM_MAX_CHARS_PER_CELL; i++)
                 ustr.append(static_cast<UChar32>(cell.chars[i]));
 
@@ -122,7 +122,7 @@ void Terminal::render(SDL_Renderer *renderer, const SDL_Rect& window_rect)
 				if (U_FAILURE(status))
 					error<FAIL>("Unable to get NFKC normalizer");
 				
-				icu_75::UnicodeString ustr_normalized = 
+				icu::UnicodeString ustr_normalized = 
 					normalizer->normalize(ustr, status);
 				
 				if (U_SUCCESS(status))

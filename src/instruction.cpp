@@ -542,8 +542,15 @@ static inline void ASSIGN_IF_NO_EXC(uint64_t rd, uint64_t value)
 {
 	uint64_t tmp = value;
 	if (cpu->exception.current == Exception::NONE)
-		cpu->int_regs[rd] = value;
+		cpu->int_regs[rd] = tmp;
 }
+
+/*
+#define ASSIGN_IF_NO_EXC(rd, value) \
+	uint64_t tmp = (value); \
+	if (cpu->exception.current == Exception::NONE) \
+		cpu->int_regs[(rd)] = (tmp);
+*/
 
 static void funct3(Decoder decoder)
 {
@@ -555,6 +562,7 @@ static void funct3(Decoder decoder)
 
 	switch (decoder.funct3()) {
 	case Decoder::LdType::LB:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			SCAST<int8_t>(
@@ -562,7 +570,9 @@ static void funct3(Decoder decoder)
 			)
 		);
 		break;
+	}
 	case Decoder::LdType::LH:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			SCAST<int16_t>(
@@ -570,7 +580,9 @@ static void funct3(Decoder decoder)
 			)
 		);
 		break;
+	}
 	case Decoder::LdType::LW:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			SCAST<int32_t>(
@@ -578,7 +590,9 @@ static void funct3(Decoder decoder)
 			)
 		);
 		break;
+	}
 	case Decoder::LdType::LD:		
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			SCAST<int64_t>(
@@ -586,24 +600,31 @@ static void funct3(Decoder decoder)
 			)
 		);
 		break;
+	}
 	case Decoder::LdType::LBU:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			mmu->load(addr, 8)
 		);
 		break;
+	}
 	case Decoder::LdType::LHU:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			mmu->load(addr, 16)
 		);
 		break;
+	}
 	case Decoder::LdType::LWU:
+	{
 		ASSIGN_IF_NO_EXC(
 			rd,
 			mmu->load(addr, 32)
 		);
 		break;
+	}
 	default:
 		cpu->set_exception(
 			Exception::ILLEGAL_INSTRUCTION,
@@ -3003,9 +3024,6 @@ static void environment(Decoder decoder)
 	case Decoder::CSRType::WFI:
 		switch (funct7) {
 		case Decoder::CSRType::WFI7:
-		#ifndef EMU_DEBUG
-			cpu->sleep = true;
-		#endif
 			break;
 		default:
 			cpu->set_exception(
@@ -3136,7 +3154,7 @@ static void jalr(Decoder decoder)
 	uint64_t tmp = cpu->pc + 4;
 	int64_t val = cpu->int_regs[rs1];
 	
-	cpu->pc = ((val + imm) & ~1U) - 4;
+	cpu->pc = ((val + imm) & ~1) - 4;
 	cpu->int_regs[rd] = tmp;
 }
 

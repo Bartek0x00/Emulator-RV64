@@ -143,7 +143,7 @@ uint32_t Cpu::_iterate(void)
 		);
 		return 4;
 	}
-
+	
 	return Instruction::execute(decoder);
 }
 

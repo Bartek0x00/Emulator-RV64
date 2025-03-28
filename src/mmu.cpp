@@ -6,7 +6,7 @@ using namespace Emulator;
 uint64_t Mmu::load(uint64_t addr, uint64_t len)
 {
 	uint64_t p_addr = translate(addr, AccessType::LOAD);
-	
+
 	if (cpu->exception.current != Exception::NONE)
 		return 0;
 	
@@ -226,16 +226,19 @@ uint64_t Mmu::translate(uint64_t addr, uint64_t access_type)
 			set_cpu_error(addr, access_type);
 			return 0;
 		}
+		break;
 	case AccessType::STORE:
 		if (!entry->is_write) {
 			set_cpu_error(addr, access_type);
 			return 0;
 		}
+		break;
 	case AccessType::INSTRUCTION:
 		if (!entry->is_execute) {
 			set_cpu_error(addr, access_type);
 			return 0;
 		}
+		break;
 	}
 
 	if (!entry->is_accessed || (access_type == AccessType::STORE && !entry->is_dirty)) {

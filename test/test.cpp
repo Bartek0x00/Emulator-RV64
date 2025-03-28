@@ -85,7 +85,6 @@ static bool test_bin(const fs::directory_entry& bin_path)
 
 	while (!timeout) {
 		cpu->iterate();
-		cpu->dump_regs();
 
 		Dram *dram = static_cast<Dram*>(
 			bus->get(DeviceName::DRAM)
@@ -128,13 +127,12 @@ static bool test_bin(const fs::directory_entry& bin_path)
 	} else
 		std::cout << RED << "Timeout!\n" << CLEAR;
 	
-	cpu->dump_regs();
 	return false;
 }
 
 int main(void)
 {
-	for (const fs::directory_entry& entry : fs::directory_iterator("test")) {
+	for (const fs::directory_entry& entry : fs::directory_iterator("test/riscv-isa")) {
 		if (!fs::is_directory(entry.status()))
 			continue;
 		

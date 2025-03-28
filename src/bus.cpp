@@ -12,7 +12,7 @@ Device *Bus::get(uint64_t addr) const
 		if (!device)
 			continue;
 
-		if (addr >= device->base && addr < device->base + device->size)
+		if ((addr >= device->base) && (addr < (device->base + device->size)))
 			return device;
 	}
 

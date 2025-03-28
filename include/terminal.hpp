@@ -3,13 +3,8 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <cstdlib>
-#include <cstdint>
 #include <cstring>
 #include <iostream>
-#include <memory>
-#include <sys/wait.h>
-#include <termios.h>
-#include <unistd.h>
 #include <vterm.h>
 #include <vector>
 

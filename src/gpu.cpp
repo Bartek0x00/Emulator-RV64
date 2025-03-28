@@ -17,7 +17,7 @@ Gpu::Gpu(uint32_t _width, uint32_t _height) :
 		);
 
 	window = SDL_CreateWindow(
-		"I15", 
+		"Emulator-RV64", 
 		SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED,
 		width, height,
@@ -288,7 +288,7 @@ void Gpu::dispatch(void)
 	}
 	
 	if ((ier & IER_THRI) && (lsr & LSR_TEMT)) {
-		is_uart_interrupting = false;
+		is_uart_interrupting = true;
 		return;
 	}
 }
@@ -327,14 +327,23 @@ void Gpu::tick(void)
 	case SDL_KEYDOWN:
 	{
 		if (SDL_GetModState() & KMOD_CTRL) {
-			if (event.key.keysym.sym == SDLK_c)
+			switch (event.key.keysym.sym) {
+			case SDLK_c:
 				uart_putchar(0x3);
-
-			if (event.key.keysym.sym == SDLK_d)
+				break;
+			case SDLK_d:
 				uart_putchar(0x4);
-			
-			render();
-			return;
+				break;
+			case SDLK_PAGEUP:
+				resize_screen(std::min(width + 25, 1920), std::min(height + 25, 1080));
+				render_textbuffer();
+				break;
+			case SDLK_PAGEDOWN:
+				resize_screen(std::max(width - 25, 480), std::max(height - 25, 270));
+				render_textbuffer();
+				break;
+			}
+			break;
 		}
 
 		const uint8_t *state = SDL_GetKeyboardState(NULL);
@@ -348,13 +357,9 @@ void Gpu::tick(void)
 		if (!is_letter)
 			uart_putchar((char)keycode);
 		else if (is_shift || is_caps)
-			uart_putchar(
-				(char)SDL_toupper((char)keycode)
-			);
+			uart_putchar(SDL_toupper((char)keycode));
 		else
-			uart_putchar(
-				(char)SDL_tolower((char)keycode)
-			);
+			uart_putchar(SDL_tolower((char)keycode));
 
 		break;
 	}
